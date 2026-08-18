@@ -99,9 +99,13 @@ class DonationOut(BaseModel):
     created_at: datetime
     donor_name: Optional[str] = None
     donor_phone: Optional[str] = None
+    claimed_by_name: Optional[str] = None
+    claimed_by_phone: Optional[str] = None
+    claimed_by_role: Optional[str] = None
 
     class Config:
         from_attributes = True
+
 
 class FoodRequestCreate(BaseModel):
     donation_id: int

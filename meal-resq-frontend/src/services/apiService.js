@@ -620,6 +620,9 @@ export const apiService = {
             food_image: d.food_image,
             donor_name: d.donor_name || 'Food Donor',
             donor_phone: d.donor_phone || '',
+            claimed_by_name: d.claimed_by_name || null,
+            claimed_by_phone: d.claimed_by_phone || null,
+            claimed_by_role: d.claimed_by_role || null,
             status: d.status || 'available',
           }));
 
@@ -709,6 +712,9 @@ export const apiService = {
             food_image: d.food_image,
             donor_name: d.donor_name || 'Food Donor',
             donor_phone: d.donor_phone || '',
+            claimed_by_name: d.claimed_by_name || null,
+            claimed_by_phone: d.claimed_by_phone || null,
+            claimed_by_role: d.claimed_by_role || null,
             status: d.status || 'available',
           }));
 

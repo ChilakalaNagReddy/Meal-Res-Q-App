@@ -63,8 +63,26 @@ def get_donor_donations(
         else:
             item.donor_name = current_user.name
             item.donor_phone = current_user.phone
+
+        if d.pickups and len(d.pickups) > 0:
+            p = d.pickups[-1]
+            if p.ngo and p.ngo.user:
+                item.claimed_by_name = p.ngo.user.name
+                item.claimed_by_phone = p.ngo.user.phone
+                item.claimed_by_role = "NGO Partner"
+            elif p.volunteer and p.volunteer.user:
+                item.claimed_by_name = p.volunteer.user.name
+                item.claimed_by_phone = p.volunteer.user.phone
+                item.claimed_by_role = "Volunteer Driver"
+            elif p.needer_id:
+                needer_user = db.query(User).filter(User.id == p.needer_id).first()
+                if needer_user:
+                    item.claimed_by_name = needer_user.name
+                    item.claimed_by_phone = needer_user.phone
+                    item.claimed_by_role = "Community Member"
         result.append(item)
     return result
+
 
 
 @router.delete("/donations/{donation_id}")
