@@ -1,0 +1,16 @@
+# Node & Expo dependencies
+node_modules/
+.expo/
+dist/
+web-build/
+.npm/
+
+# Environment files
+.env.local
+.env.development.local
+
+# OS & IDE files
+.DS_Store
+Thumbs.db
+.idea/
+.vscode/
