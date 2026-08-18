@@ -794,9 +794,12 @@ export const apiService = {
 
   getGroupedHistoryDonations(user) {
     loadDonationsFromStorage();
+    if (!user) return {};
+
     const role = user?.role || 'donor';
-    const userName = user?.name || '';
+    const userName = (user?.name || '').toLowerCase().trim();
     const userId = user?.id;
+    const userEmail = (user?.email || '').toLowerCase().trim();
 
     const historyItems = localDonationsStore.filter(d => {
       if (!d || deletedDonationIdsSet.has(String(d.id))) return false;
@@ -804,22 +807,23 @@ export const apiService = {
       if (!isClaimed) return false;
 
       if (role === 'donor') {
-        // Donor sees items posted by this donor that are claimed
-        return true;
+        // Donor sees ONLY claimed items posted by THIS donor!
+        const isMyDonation = (
+          (d.donor_id && String(d.donor_id) === String(userId)) ||
+          (d.donor_name && d.donor_name.toLowerCase().trim() === userName && userName.length > 0) ||
+          (d.donor_email && d.donor_email.toLowerCase().trim() === userEmail && userEmail.length > 0)
+        );
+        return isMyDonation;
       }
-      if (role === 'ngo') {
-        // NGO sees items claimed by THIS NGO
-        return d.claimed_by_id === userId || d.claimed_by_name === userName || d.claimed_by_role === 'NGO Partner';
-      }
-      if (role === 'volunteer') {
-        // Volunteer sees items claimed by THIS Volunteer
-        return d.claimed_by_id === userId || d.claimed_by_name === userName || d.claimed_by_role === 'Volunteer Driver' || d.claimed_by_role === 'Food Rescue Volunteer';
-      }
-      if (role === 'needer') {
-        // Needer sees items claimed by THIS Needer alone!
-        return d.claimed_by_id === userId || d.claimed_by_name === userName || d.claimed_by_role === 'Community Member';
-      }
-      return true;
+
+      // For NGO, Volunteer, Needer: MUST match THIS specific claimer user ID / Name / Email EXACTLY!
+      const isMyClaim = (
+        (d.claimed_by_id && String(d.claimed_by_id) === String(userId)) ||
+        (d.claimed_by_name && d.claimed_by_name.toLowerCase().trim() === userName && userName.length > 0 && d.claimed_by_name !== 'Food Claimer') ||
+        (d.claimed_by_email && d.claimed_by_email.toLowerCase().trim() === userEmail && userEmail.length > 0)
+      );
+
+      return isMyClaim;
     });
 
     const grouped = {};
@@ -833,6 +837,7 @@ export const apiService = {
     }
     return grouped;
   },
+
 
 
 
