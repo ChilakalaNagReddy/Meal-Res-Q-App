@@ -198,19 +198,6 @@ export function DonorDashboardScreen({ navigation, user, onLogout }) {
                           💬 Chat {apiService.hasUnreadChat(item.id, 'donor') ? '🔴' : ''}
                         </Text>
                       </TouchableOpacity>
-
-                      <TouchableOpacity
-                        style={[styles.commBtn, { backgroundColor: '#8b5cf6', position: 'relative' }]}
-                        onPress={() => {
-                          setSelectedCommItem({ ...item, phone: item.claimed_by_phone || '+91 9876500000', food_name: item.food_name });
-                          setCommType('voice');
-                          setCommModalVisible(true);
-                        }}
-                      >
-                        <Text style={styles.commBtnText}>
-                          🎙️ Voice Note {apiService.hasUnreadVoice(item.id, 'donor') ? '🔴' : ''}
-                        </Text>
-                      </TouchableOpacity>
                     </View>
                   </View>
                 ) : (

@@ -207,19 +207,6 @@ export function NeederDashboardScreen({ navigation, user, onLogout }) {
                           💬 Chat {apiService.hasUnreadChat(item.id, 'needer') ? '🔴' : ''}
                         </Text>
                       </TouchableOpacity>
-
-                      <TouchableOpacity
-                        style={[styles.commBtn, { backgroundColor: '#8b5cf6', position: 'relative' }]}
-                        onPress={() => {
-                          setSelectedCommItem(item);
-                          setCommType('voice');
-                          setCommModalVisible(true);
-                        }}
-                      >
-                        <Text style={styles.commBtnText}>
-                          🎙️ Voice Note {apiService.hasUnreadVoice(item.id, 'needer') ? '🔴' : ''}
-                        </Text>
-                      </TouchableOpacity>
                     </View>
                   </View>
                 ))}

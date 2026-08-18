@@ -252,43 +252,8 @@ export function DonationCommunicationModal({ visible, type, item, onClose, curre
 
 
 
-          {/* VOICE NOTE MODAL CONTENT */}
-          {type === 'voice' && (
-            <View style={styles.contentBox}>
-              <Text style={{ fontSize: 44, textAlign: 'center', marginTop: 10 }}>🎙️</Text>
-              
-              {voiceNotice ? (
-                <Text style={{ color: isRecording ? '#ef4444' : colors.primary, textAlign: 'center', fontWeight: '700', marginVertical: 10, fontSize: 13 }}>
-                  {voiceNotice}
-                </Text>
-              ) : (
-                <Text style={{ color: colors.textSecondary, textAlign: 'center', marginVertical: 10, fontSize: 13 }}>
-                  Record a quick audio message to explain pickup coordinates or food packaging details:
-                </Text>
-              )}
+          {/* VOICE NOTE OPTION REMOVED AS REQUESTED */}
 
-              <View style={{ flexDirection: 'row', justifyContent: 'center', gap: 12, marginVertical: 12 }}>
-                <TouchableOpacity
-                  style={[styles.recordBtn, { backgroundColor: isRecording ? '#ef4444' : '#8b5cf6' }]}
-                  onPress={toggleRecording}
-                >
-                  <Text style={styles.actionBtnText}>{isRecording ? '⏹️ Stop Recording' : '🎙️ Record Voice Note'}</Text>
-                </TouchableOpacity>
-
-                {hasVoiceNote ? (
-                  <TouchableOpacity style={[styles.recordBtn, { backgroundColor: '#10b981' }]} onPress={handlePlayVoice}>
-                    <Text style={styles.actionBtnText}>{isPlaying ? '⏸️ Pause' : '▶️ Listen Note'}</Text>
-                  </TouchableOpacity>
-                ) : null}
-              </View>
-
-              {hasVoiceNote ? (
-                <TouchableOpacity style={[styles.actionBtn, { backgroundColor: colors.primary, marginTop: 10 }]} onPress={handleSendVoiceNote}>
-                  <Text style={styles.actionBtnText}>🚀 Send Voice Message</Text>
-                </TouchableOpacity>
-              ) : null}
-            </View>
-          )}
 
         </View>
       </View>
