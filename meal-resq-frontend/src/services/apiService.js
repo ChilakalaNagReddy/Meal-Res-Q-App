@@ -470,10 +470,11 @@ export const apiService = {
     // Add new item to top of local store
     localDonationsStore = [newItem, ...localDonationsStore.filter(d => String(d.id) !== String(newItem.id))];
 
-    // Broadcast real-time notification alert to everyone
+    // Broadcast real-time notification alert to receivers (NGO, Volunteer, Needer)
     localNotificationsStore = [
       {
         id: Date.now(),
+        is_broadcast_to_receivers: true,
         title: `🍲 New Surplus Food Posted: ${newItem.food_name}`,
         message: `Fresh ${newItem.quantity} of ${newItem.category} posted at ${newItem.pickup_address}. Available now for NGO & community claim!`,
         created_at: `🕒 Posted Today at ${timeStr}`,
@@ -481,6 +482,7 @@ export const apiService = {
       },
       ...localNotificationsStore,
     ];
+
 
     saveDonationsToStorage();
     notifyDonationChange();
@@ -878,22 +880,23 @@ export const apiService = {
     const userEmail = (user.email || '').toLowerCase().trim();
 
     return nonDeleted.filter(n => {
-      // 1. Food Donor: ONLY see claimed food alerts for donations posted by THIS donor!
       if (role === 'donor') {
         const isTargetedToMe = (n.target_user_id && String(n.target_user_id) === userId) ||
                                (n.target_user_email && n.target_user_email.toLowerCase().trim() === userEmail && userEmail.length > 0);
         const isClaimedAlert = n.title && (n.title.includes('Food Claimed Alert') || n.title.includes('Food Claimed'));
-        return isTargetedToMe && isClaimedAlert;
+        return Boolean(isTargetedToMe && isClaimedAlert);
       }
 
-      // 2. Receiver (NGO / Volunteer / Needer): ONLY see claim confirmations for food THEY personally claimed!
       const isTargetedToMe = (n.target_user_id && String(n.target_user_id) === userId) ||
                              (n.target_user_email && n.target_user_email.toLowerCase().trim() === userEmail && userEmail.length > 0);
-      const isMyClaimConfirmed = n.title && (n.title.includes('Food Claim Confirmed') || n.title.includes('Meal Reservation Confirmed'));
+      const isMyClaimConfirmed = Boolean(isTargetedToMe && n.title && (n.title.includes('Food Claim Confirmed') || n.title.includes('Meal Reservation Confirmed')));
+      const isNewFoodPosted = Boolean(n.is_broadcast_to_receivers || (n.title && (n.title.includes('New Surplus Food') || n.title.includes('New Food Available') || n.title.includes('New Food'))));
 
-      return isTargetedToMe && isMyClaimConfirmed;
+      return Boolean(isMyClaimConfirmed || isNewFoodPosted);
     });
   },
+
+
 
 
 

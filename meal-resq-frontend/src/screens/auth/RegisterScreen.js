@@ -109,11 +109,12 @@ export function RegisterScreen({ navigation, selectedRole, onChangeRole, onRegis
 
     const generatedOtp = (otpRes && otpRes.otp) ? otpRes.otp : '123456';
     setActiveOtpCode(generatedOtp);
-    setOtpNotice(`📩 Verification code sent directly to ${cleanEmail}.\n🔑 Your OTP Code: ${generatedOtp} (or use code 123456)`);
+    setOtpNotice(`📩 Verification code sent directly to ${cleanEmail}. Please check your email inbox.`);
     setEmailOtp('');
     setResendTimer(10);
     setOtpModalVisible(true);
   };
+
 
 
 
@@ -362,23 +363,19 @@ export function RegisterScreen({ navigation, selectedRole, onChangeRole, onRegis
               Verification code sent directly to <Text style={{ fontWeight: '800', color: colors.primary }}>{email}</Text>. Please check your email inbox.
             </Text>
 
-            {otpNotice ? <Text style={styles.otpNoticeText}>{otpNotice}</Text> : null}
-
             <View style={styles.inputGroup}>
               <Text style={[styles.label, { color: colors.textPrimary }]}>🔑 Enter 6-Digit OTP Code</Text>
               <TextInput
                 style={[styles.input, { backgroundColor: colors.background, color: colors.textPrimary, borderColor: colors.surfaceBorder, textAlign: 'center', fontSize: 20, letterSpacing: 4 }]}
-                placeholder="123456"
+                placeholder="••••••"
                 placeholderTextColor={colors.textMuted}
                 value={emailOtp}
                 onChangeText={setEmailOtp}
                 keyboardType="number-pad"
                 maxLength={6}
               />
-              <Text style={{ fontSize: 11, color: colors.textMuted, marginTop: 4, textAlign: 'center' }}>
-                💡 Master verification code: <Text style={{ color: colors.primary, fontWeight: '800' }}>123456</Text>
-              </Text>
             </View>
+
 
 
             <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginVertical: 8 }}>
