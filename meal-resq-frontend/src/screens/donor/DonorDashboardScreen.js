@@ -12,7 +12,7 @@ export function DonorDashboardScreen({ navigation, user, onLogout }) {
 
   const { colors } = useTheme();
   const { t } = useLanguage();
-  const [donations, setDonations] = useState(() => apiService.getLocalDonationsSync());
+  const [donations, setDonations] = useState(() => apiService.getLocalDonationsSync(user));
   const [loading, setLoading] = useState(false);
   const [activeTab, setActiveTab] = useState('active'); // 'active' or 'history'
 
@@ -30,7 +30,7 @@ export function DonorDashboardScreen({ navigation, user, onLogout }) {
   useEffect(() => {
     fetchDonations();
     const unsubSub = apiService.subscribeToDonations(() => {
-      setDonations(apiService.getLocalDonationsSync());
+      setDonations(apiService.getLocalDonationsSync(user));
       fetchDonations();
     });
     const interval = setInterval(() => {
@@ -52,7 +52,7 @@ export function DonorDashboardScreen({ navigation, user, onLogout }) {
 
   const fetchDonations = async () => {
     try {
-      const data = await apiService.getDonorDonations();
+      const data = await apiService.getDonorDonations(user);
       if (Array.isArray(data)) {
         setDonations(data);
       }

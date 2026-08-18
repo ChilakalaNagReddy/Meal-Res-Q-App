@@ -570,9 +570,16 @@ export const apiService = {
 
 
 
-  getLocalDonationsSync() {
+  getLocalDonationsSync(currentUser) {
     loadDonationsFromStorage();
-    return localDonationsStore.filter(d => !deletedDonationIdsSet.has(String(d.id)));
+    if (!currentUser) return localDonationsStore.filter(d => !deletedDonationIdsSet.has(String(d.id)));
+    return localDonationsStore.filter(d => {
+      if (!d || deletedDonationIdsSet.has(String(d.id))) return false;
+      if (currentUser.role === 'donor') {
+        return d.donor_id === currentUser.id || d.donor_name === currentUser.name || d.donor_email === currentUser.email;
+      }
+      return true;
+    });
   },
 
   getAvailableDonationsSync() {
@@ -580,7 +587,7 @@ export const apiService = {
     return localDonationsStore.filter(d => d.status === 'available' && !deletedDonationIdsSet.has(String(d.id)));
   },
 
-  async getMyDonations() {
+  async getMyDonations(currentUser) {
     loadDonationsFromStorage();
     try {
       const headers = await authHeaders();
@@ -588,25 +595,9 @@ export const apiService = {
       if (res && res.ok) {
         const data = await res.json();
         if (Array.isArray(data)) {
-          const remoteIds = new Set(data.map(d => String(d.id)));
-          const remoteKeys = new Set(data.map(d => `${d.food_name}_${d.quantity}_${d.pickup_address}`));
-
-          const localOnly = localDonationsStore.filter(d => {
-            const idStr = String(d.id);
-            if (remoteIds.has(idStr)) return false;
-            
-            const matchKey = `${d.food_name}_${d.quantity}_${d.pickup_address}`;
-            if (remoteKeys.has(matchKey)) return false;
-
-            const isTemp = idStr.startsWith('temp_') || d.temp_id || d.is_optimistic;
-            const isRecent = d.posted_timestamp && (Date.now() - d.posted_timestamp < 120000);
-            if (isTemp || isRecent) return true;
-
-            return false;
-          });
-
           const formattedRemote = data.map(d => ({
             id: d.id,
+            donor_id: d.donor_id,
             created_at: d.created_at ? `🕒 Posted at ${new Date(d.created_at).toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'})}` : '🕒 Posted Today',
             posted_at: d.created_at ? `🕒 Posted at ${new Date(d.created_at).toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'})}` : '🕒 Posted Today',
             posted_timestamp: d.created_at ? new Date(d.created_at).getTime() : Date.now(),
@@ -626,16 +617,7 @@ export const apiService = {
             status: d.status || 'available',
           }));
 
-
-          const combined = [...formattedRemote, ...localOnly];
-          const seen = new Set();
-          localDonationsStore = combined.filter(d => {
-            if (deletedDonationIdsSet.has(String(d.id))) return false;
-            const k = String(d.id);
-            if (seen.has(k)) return false;
-            seen.add(k);
-            return true;
-          });
+          localDonationsStore = formattedRemote;
           saveDonationsToStorage();
           notifyDonationChange();
         }
@@ -643,12 +625,20 @@ export const apiService = {
     } catch (e) {
       console.warn('getMyDonations remote fetch error:', e);
     }
+
+    if (currentUser) {
+      return localDonationsStore.filter(d => {
+        if (!d || deletedDonationIdsSet.has(String(d.id))) return false;
+        return d.donor_id === currentUser.id || d.donor_name === currentUser.name || d.donor_email === currentUser.email;
+      });
+    }
     return localDonationsStore.filter(d => !deletedDonationIdsSet.has(String(d.id)));
   },
 
-  async getDonorDonations() {
-    return this.getMyDonations();
+  async getDonorDonations(currentUser) {
+    return this.getMyDonations(currentUser);
   },
+
 
   async deleteDonation(id) {
     const idStr = String(id);

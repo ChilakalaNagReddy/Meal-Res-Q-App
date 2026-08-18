@@ -53,7 +53,7 @@ def get_donor_donations(
     db: Any = Depends(get_db),
     current_user: User = Depends(get_current_user)
 ):
-    donations = db.query(Donation).order_by(Donation.created_at.desc()).all()
+    donations = db.query(Donation).filter(Donation.donor_id == current_user.id).order_by(Donation.created_at.desc()).all()
     result = []
     for d in donations:
         item = DonationOut.from_orm(d)
