@@ -759,6 +759,7 @@ export const apiService = {
           claimed_at: todayStr,
           claimed_time_str: timeStr,
           day_label: '📅 Today',
+          claimed_by_id: claimerUser?.id,
           claimed_by_name: claimerName,
           claimed_by_phone: claimerPhone,
           claimed_by_role: claimerRole,
@@ -803,7 +804,34 @@ export const apiService = {
 
   getGroupedHistoryDonations(user) {
     loadDonationsFromStorage();
-    const historyItems = localDonationsStore.filter(d => d && (d.status === 'claimed' || d.status === 'reserved' || d.status === 'rescued') && !deletedDonationIdsSet.has(String(d.id)));
+    const role = user?.role || 'donor';
+    const userName = user?.name || '';
+    const userId = user?.id;
+
+    const historyItems = localDonationsStore.filter(d => {
+      if (!d || deletedDonationIdsSet.has(String(d.id))) return false;
+      const isClaimed = d.status === 'claimed' || d.status === 'reserved' || d.status === 'rescued';
+      if (!isClaimed) return false;
+
+      if (role === 'donor') {
+        // Donor sees items posted by this donor that are claimed
+        return true;
+      }
+      if (role === 'ngo') {
+        // NGO sees items claimed by THIS NGO
+        return d.claimed_by_id === userId || d.claimed_by_name === userName || d.claimed_by_role === 'NGO Partner';
+      }
+      if (role === 'volunteer') {
+        // Volunteer sees items claimed by THIS Volunteer
+        return d.claimed_by_id === userId || d.claimed_by_name === userName || d.claimed_by_role === 'Volunteer Driver' || d.claimed_by_role === 'Food Rescue Volunteer';
+      }
+      if (role === 'needer') {
+        // Needer sees items claimed by THIS Needer alone!
+        return d.claimed_by_id === userId || d.claimed_by_name === userName || d.claimed_by_role === 'Community Member';
+      }
+      return true;
+    });
+
     const grouped = {};
     historyItems.forEach(item => {
       const dateKey = item.day_label || (item.claimed_at ? `📅 ${new Date(item.claimed_at).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}` : '📅 Today');
@@ -815,6 +843,7 @@ export const apiService = {
     }
     return grouped;
   },
+
 
 
 
