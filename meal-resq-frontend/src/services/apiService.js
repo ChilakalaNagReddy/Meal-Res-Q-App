@@ -856,6 +856,8 @@ export const apiService = {
   // Notifications
   async getNotifications(user) {
     loadNotificationsFromStorage();
+    if (!user) return [];
+
     try {
       const headers = await authHeaders();
       const res = await fetchWithFallback('/api/v1/notifications', { headers });
@@ -871,23 +873,28 @@ export const apiService = {
     } catch (e) {}
 
     const nonDeleted = localNotificationsStore.filter(n => !deletedNotificationIdsSet.has(String(n.id)));
-    if (!user) return nonDeleted;
-
     const role = user.role;
-    const userId = user.id;
+    const userId = String(user.id);
     const userEmail = (user.email || '').toLowerCase().trim();
 
     return nonDeleted.filter(n => {
-      if (n.target_user_id && String(n.target_user_id) === String(userId)) return true;
-      if (n.user_id && String(n.user_id) === String(userId)) return true;
-      if (n.target_user_email && n.target_user_email.toLowerCase().trim() === userEmail && userEmail.length > 0) return true;
-
-      if (!n.target_user_id && !n.user_id) {
-        if (role === 'donor' && n.title.includes('Claimed')) return true;
+      // 1. Food Donor: ONLY see claimed food alerts for donations posted by THIS donor!
+      if (role === 'donor') {
+        const isTargetedToMe = (n.target_user_id && String(n.target_user_id) === userId) ||
+                               (n.target_user_email && n.target_user_email.toLowerCase().trim() === userEmail && userEmail.length > 0);
+        const isClaimedAlert = n.title && (n.title.includes('Food Claimed Alert') || n.title.includes('Food Claimed'));
+        return isTargetedToMe && isClaimedAlert;
       }
-      return false;
+
+      // 2. Receiver (NGO / Volunteer / Needer): ONLY see claim confirmations for food THEY personally claimed!
+      const isTargetedToMe = (n.target_user_id && String(n.target_user_id) === userId) ||
+                             (n.target_user_email && n.target_user_email.toLowerCase().trim() === userEmail && userEmail.length > 0);
+      const isMyClaimConfirmed = n.title && (n.title.includes('Food Claim Confirmed') || n.title.includes('Meal Reservation Confirmed'));
+
+      return isTargetedToMe && isMyClaimConfirmed;
     });
   },
+
 
 
 
