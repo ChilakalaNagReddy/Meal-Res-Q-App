@@ -363,6 +363,13 @@ export function RegisterScreen({ navigation, selectedRole, onChangeRole, onRegis
               Verification code sent directly to <Text style={{ fontWeight: '800', color: colors.primary }}>{email}</Text>. Please check your email inbox.
             </Text>
 
+            {otpNotice ? (
+              <Text style={{ color: '#ef4444', textAlign: 'center', marginVertical: 8, fontSize: 13, fontWeight: '700' }}>
+                {otpNotice}
+              </Text>
+            ) : null}
+
+
             <View style={styles.inputGroup}>
               <Text style={[styles.label, { color: colors.textPrimary }]}>🔑 Enter 6-Digit OTP Code</Text>
               <TextInput

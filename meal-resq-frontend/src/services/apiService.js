@@ -281,6 +281,11 @@ export const apiService = {
     return msgs.some(m => userRole === 'donor' ? m.unreadForDonor : m.unreadForClaimer);
   },
 
+  hasUnreadVoice() {
+    return false;
+  },
+
+
 
   getCommunityChatMessages() {
     loadChatFromStorage();

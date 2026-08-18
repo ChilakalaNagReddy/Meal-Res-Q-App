@@ -184,7 +184,7 @@ export function ChatScreen({ user, onLogout }) {
               <Text style={{ fontSize: 36, marginBottom: 8 }}>💬</Text>
               <Text style={[styles.emptyTitle, { color: colors.textPrimary }]}>No Community Messages Yet</Text>
               <Text style={[styles.emptySub, { color: colors.textSecondary }]}>
-                Send a text or voice message below to broadcast live to all donors, NGOs, volunteers, and community members!
+                Send a text message below to broadcast live to all donors, NGOs, volunteers, and community members!
               </Text>
             </View>
           ) : (
@@ -196,7 +196,6 @@ export function ChatScreen({ user, onLogout }) {
 
                 {groupedMsgs[dayLabel].map((msg) => {
                   const isMe = user?.name ? (msg.senderName === user.name) : (msg.senderRole === user?.role);
-                  const isPlayingThis = playingMsgId === msg.id;
 
                   return (
                     <TouchableOpacity
@@ -214,21 +213,9 @@ export function ChatScreen({ user, onLogout }) {
                         {isMe ? 'You' : `${msg.senderName} (${(msg.senderRole || 'User').toUpperCase()})`} • {msg.time} {msg.edited ? '(edited)' : ''}
                       </Text>
 
-                      {msg.isVoice ? (
-                        <TouchableOpacity
-                          style={{ flexDirection: 'row', alignItems: 'center', gap: 8, marginTop: 4, backgroundColor: 'rgba(0,0,0,0.15)', paddingHorizontal: 10, paddingVertical: 6, borderRadius: 8 }}
-                          onPress={() => handlePlayVoice(msg.id)}
-                        >
-                          <Text style={{ fontSize: 16 }}>{isPlayingThis ? '⏸️' : '▶️'}</Text>
-                          <Text style={{ fontSize: 12, fontWeight: '800', color: isMe ? '#FFF' : colors.textPrimary }}>
-                            {isPlayingThis ? 'Playing Voice Note...' : msg.text}
-                          </Text>
-                        </TouchableOpacity>
-                      ) : (
-                        <Text style={{ fontSize: 13, color: isMe ? '#FFF' : colors.textPrimary, fontWeight: '500' }}>
-                          {msg.text}
-                        </Text>
-                      )}
+                      <Text style={{ fontSize: 13, color: isMe ? '#FFF' : colors.textPrimary, fontWeight: '500' }}>
+                        {msg.text}
+                      </Text>
                     </TouchableOpacity>
                   );
                 })}
@@ -247,17 +234,9 @@ export function ChatScreen({ user, onLogout }) {
             onChangeText={setInputText}
           />
 
-          {!editingMsgId ? (
-            <TouchableOpacity
-              style={[styles.voiceBtn, { backgroundColor: isRecording ? '#ef4444' : '#8b5cf6' }]}
-              onPress={handleToggleRecordVoice}
-            >
-              <Text style={{ color: '#FFF', fontWeight: '800', fontSize: 14 }}>{isRecording ? '⏹️ Stop' : '🎙️ Voice'}</Text>
-            </TouchableOpacity>
-          ) : null}
-
           <TouchableOpacity style={[styles.sendBtn, { backgroundColor: editingMsgId ? '#3b82f6' : colors.primary }]} onPress={handleSendMessage}>
             <Text style={{ color: '#FFF', fontWeight: '800', fontSize: 14 }}>{editingMsgId ? 'Save' : 'Send'}</Text>
+
           </TouchableOpacity>
         </View>
       </View>

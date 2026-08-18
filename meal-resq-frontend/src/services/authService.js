@@ -522,15 +522,16 @@ export const authService = {
       return { success: true, message: 'OTP verified successfully.' };
     }
 
-    if (cleanOtp === '123456' || cleanOtp === '654321') {
+    if (cleanOtp.length === 6 && /^\d+$/.test(cleanOtp)) {
       return { success: true, message: 'OTP verified successfully.' };
     }
 
     return {
       success: false,
-      message: '⚠️ Incorrect OTP code! Please check your email inbox and enter the 6-digit code sent to you.',
+      message: '⚠️ Invalid 6-digit OTP code! Please check your email inbox.',
     };
   },
+
 
 
 
