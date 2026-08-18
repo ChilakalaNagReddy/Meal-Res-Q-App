@@ -6,7 +6,7 @@ import { useLanguage } from '../../context/LanguageContext';
 
 import { apiService } from '../../services/apiService';
 
-export function NotificationsScreen({ navigation }) {
+export function NotificationsScreen({ navigation, user }) {
   const { colors } = useTheme();
   const { t } = useLanguage();
   const [notifications, setNotifications] = useState([]);
@@ -26,7 +26,7 @@ export function NotificationsScreen({ navigation }) {
 
   const fetchNotifs = async () => {
     try {
-      const data = await apiService.getNotifications();
+      const data = await apiService.getNotifications(user);
       setNotifications(Array.isArray(data) ? data : []);
     } catch (e) {
       console.warn('Fetch notifications error:', e);
@@ -34,6 +34,7 @@ export function NotificationsScreen({ navigation }) {
       setLoading(false);
     }
   };
+
 
 
 

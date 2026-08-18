@@ -737,9 +737,11 @@ export const apiService = {
   async acceptDonation(id, claimerUser) {
     const timeStr = formatCurrentTime();
     const todayStr = new Date().toISOString();
-    const claimerName = claimerUser?.name || 'Helping Hands NGO';
-    const claimerPhone = claimerUser?.phone || '+91 9876500000';
-    const claimerRole = claimerUser?.role === 'ngo' ? 'NGO Partner' : claimerUser?.role === 'volunteer' ? 'Food Rescue Volunteer' : 'Community Member';
+    const targetItem = localDonationsStore.find(item => String(item.id) === String(id));
+    const foodName = targetItem ? targetItem.food_name : `Meal #${id}`;
+    const donorId = targetItem ? targetItem.donor_id : null;
+    const donorEmail = targetItem ? targetItem.donor_email : null;
+    const donorName = targetItem ? targetItem.donor_name : null;
 
     localDonationsStore = localDonationsStore.map(item => {
       if (String(item.id) === String(id)) {
@@ -750,6 +752,7 @@ export const apiService = {
           claimed_time_str: timeStr,
           day_label: '📅 Today',
           claimed_by_id: claimerUser?.id,
+          claimed_by_email: claimerUser?.email,
           claimed_by_name: claimerName,
           claimed_by_phone: claimerPhone,
           claimed_by_role: claimerRole,
@@ -757,11 +760,25 @@ export const apiService = {
       }
       return item;
     });
+
     localNotificationsStore = [
       {
         id: Date.now(),
+        target_user_id: donorId,
+        target_user_email: donorEmail,
+        target_user_role: 'donor',
         title: '🎉 Food Claimed Alert!',
-        message: `${claimerName} (${claimerRole}) claimed surplus meal #${id}. Contact info: ${claimerPhone}`,
+        message: `${claimerName} (${claimerRole}) claimed your surplus meal '${foodName}'. Contact info: ${claimerPhone}`,
+        created_at: `🕒 Posted Today at ${timeStr}`,
+        posted_at: `🕒 Posted Today at ${timeStr}`,
+      },
+      {
+        id: Date.now() + 1,
+        target_user_id: claimerUser?.id,
+        target_user_email: claimerUser?.email,
+        target_user_role: claimerUser?.role,
+        title: '✅ Food Claim Confirmed!',
+        message: `You successfully claimed '${foodName}' from ${donorName || 'Donor'}.`,
         created_at: `🕒 Posted Today at ${timeStr}`,
         posted_at: `🕒 Posted Today at ${timeStr}`,
       },
@@ -807,7 +824,6 @@ export const apiService = {
       if (!isClaimed) return false;
 
       if (role === 'donor') {
-        // Donor sees ONLY claimed items posted by THIS donor!
         const isMyDonation = (
           (d.donor_id && String(d.donor_id) === String(userId)) ||
           (d.donor_name && d.donor_name.toLowerCase().trim() === userName && userName.length > 0) ||
@@ -816,7 +832,6 @@ export const apiService = {
         return isMyDonation;
       }
 
-      // For NGO, Volunteer, Needer: MUST match THIS specific claimer user ID / Name / Email EXACTLY!
       const isMyClaim = (
         (d.claimed_by_id && String(d.claimed_by_id) === String(userId)) ||
         (d.claimed_by_name && d.claimed_by_name.toLowerCase().trim() === userName && userName.length > 0 && d.claimed_by_name !== 'Food Claimer') ||
@@ -837,6 +852,43 @@ export const apiService = {
     }
     return grouped;
   },
+
+  // Notifications
+  async getNotifications(user) {
+    loadNotificationsFromStorage();
+    try {
+      const headers = await authHeaders();
+      const res = await fetchWithFallback('/api/v1/notifications', { headers });
+      if (res && res.ok) {
+        const data = await res.json();
+        if (Array.isArray(data) && data.length > 0) {
+          const remoteIds = new Set(data.map(d => String(d.id)));
+          const extraLocal = localNotificationsStore.filter(d => !remoteIds.has(String(d.id)));
+          localNotificationsStore = [...data, ...extraLocal].filter(n => !deletedNotificationIdsSet.has(String(n.id)));
+          saveNotificationsToStorage();
+        }
+      }
+    } catch (e) {}
+
+    const nonDeleted = localNotificationsStore.filter(n => !deletedNotificationIdsSet.has(String(n.id)));
+    if (!user) return nonDeleted;
+
+    const role = user.role;
+    const userId = user.id;
+    const userEmail = (user.email || '').toLowerCase().trim();
+
+    return nonDeleted.filter(n => {
+      if (n.target_user_id && String(n.target_user_id) === String(userId)) return true;
+      if (n.user_id && String(n.user_id) === String(userId)) return true;
+      if (n.target_user_email && n.target_user_email.toLowerCase().trim() === userEmail && userEmail.length > 0) return true;
+
+      if (!n.target_user_id && !n.user_id) {
+        if (role === 'donor' && n.title.includes('Claimed')) return true;
+      }
+      return false;
+    });
+  },
+
 
 
 
