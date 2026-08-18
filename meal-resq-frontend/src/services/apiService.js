@@ -770,8 +770,8 @@ export const apiService = {
       },
       ...localNotificationsStore,
     ];
+    saveDonationsToStorage();
     notifyDonationChange();
-
 
     try {
       const headers = await authHeaders();
@@ -794,6 +794,22 @@ export const apiService = {
     }
     return this.acceptDonation(id, claimerUser);
   },
+
+  getGroupedHistoryDonations(user) {
+    loadDonationsFromStorage();
+    const historyItems = localDonationsStore.filter(d => d && (d.status === 'claimed' || d.status === 'reserved' || d.status === 'rescued') && !deletedDonationIdsSet.has(String(d.id)));
+    const grouped = {};
+    historyItems.forEach(item => {
+      const dateKey = item.day_label || (item.claimed_at ? `📅 ${new Date(item.claimed_at).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}` : '📅 Today');
+      if (!grouped[dateKey]) grouped[dateKey] = [];
+      grouped[dateKey].push(item);
+    });
+    if (Object.keys(grouped).length === 0 && historyItems.length > 0) {
+      grouped['📅 Rescued History'] = historyItems;
+    }
+    return grouped;
+  },
+
 
 
   // Volunteer Pickups
