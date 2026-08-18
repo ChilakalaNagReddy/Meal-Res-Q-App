@@ -15,12 +15,6 @@ export function DonationCommunicationModal({ visible, type, item, onClose, curre
   const [actionModalVisible, setActionModalVisible] = useState(false);
   const [editingMsgId, setEditingMsgId] = useState(null);
 
-  // Voice Note State
-  const [isRecording, setIsRecording] = useState(false);
-  const [hasVoiceNote, setHasVoiceNote] = useState(false);
-  const [isPlaying, setIsPlaying] = useState(false);
-  const [voiceNotice, setVoiceNotice] = useState('');
-
   useEffect(() => {
     if (visible && item) {
       const msgs = apiService.getChatMessages(item.id);
@@ -31,6 +25,7 @@ export function DonationCommunicationModal({ visible, type, item, onClose, curre
       }, 100);
     }
   }, [visible, item]);
+
 
 
   if (!visible || !item) return null;
@@ -116,44 +111,8 @@ export function DonationCommunicationModal({ visible, type, item, onClose, curre
     setActionModalVisible(false);
   };
 
-  const toggleRecording = () => {
-    if (isRecording) {
-      setIsRecording(false);
-      setHasVoiceNote(true);
-      setVoiceNotice('🎙️ Voice note recorded successfully! (0:12 sec)');
-    } else {
-      setIsRecording(true);
-      setVoiceNotice('🔴 Recording voice note... Speak clearly now');
-    }
-  };
-
-  const handlePlayVoice = () => {
-    if (isPlaying) {
-      setIsPlaying(false);
-      setVoiceNotice('⏸️ Voice note paused.');
-    } else {
-      setIsPlaying(true);
-      setVoiceNotice('▶️ Playing recorded voice message (0:12)...');
-      setTimeout(() => {
-        setIsPlaying(false);
-        setVoiceNotice('✅ Voice note playback finished.');
-      }, 3000);
-    }
-  };
-
-  const handleSendVoiceNote = () => {
-    const roleStr = currentUser?.role || 'user';
-    const nameStr = currentUser?.name || 'User';
-    const updated = apiService.sendChatMessage(item.id, roleStr, nameStr, '🎙️ Voice Note (0:12 sec)', true);
-    setChatMessages([...updated]);
-    alert(`🎙️ Voice note sent directly to ${targetName} (${targetPhone})!`);
-    setHasVoiceNote(false);
-    setIsRecording(false);
-  };
-
-
-
   return (
+
     <Modal visible={visible} transparent animationType="fade" onRequestClose={onClose}>
       <View style={styles.overlay}>
         <View style={[styles.card, { backgroundColor: colors.surface, borderColor: colors.surfaceBorder }]}>

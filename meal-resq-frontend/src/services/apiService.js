@@ -278,16 +278,9 @@ export const apiService = {
     const key = String(donationId || 'default');
     const msgs = localChatStore[key];
     if (!Array.isArray(msgs)) return false;
-    return msgs.some(m => !m.isVoice && (userRole === 'donor' ? m.unreadForDonor : m.unreadForClaimer));
+    return msgs.some(m => userRole === 'donor' ? m.unreadForDonor : m.unreadForClaimer);
   },
 
-  hasUnreadVoice(donationId, userRole) {
-    loadChatFromStorage();
-    const key = String(donationId || 'default');
-    const msgs = localChatStore[key];
-    if (!Array.isArray(msgs)) return false;
-    return msgs.some(m => m.isVoice && (userRole === 'donor' ? m.unreadForDonor : m.unreadForClaimer));
-  },
 
   getCommunityChatMessages() {
     loadChatFromStorage();
