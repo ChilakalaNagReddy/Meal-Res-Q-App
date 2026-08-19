@@ -215,6 +215,17 @@ if (Platform.OS === 'web' && typeof window !== 'undefined' && typeof window.addE
   });
 }
 
+// 3-Second Live Real-Time Auto-Polling Loop (Syncs Web & Mobile App)
+if (typeof setInterval !== 'undefined') {
+  setInterval(() => {
+    try {
+      apiService.getAvailableDonations().catch(() => {});
+      apiService.getNotifications().catch(() => {});
+    } catch (e) {}
+  }, 3000);
+}
+
+
 
 
 

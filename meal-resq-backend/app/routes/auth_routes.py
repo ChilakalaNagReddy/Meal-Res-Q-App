@@ -247,6 +247,24 @@ def check_email(email: str, role: str = None, db: Any = Depends(get_db)):
     return {"exists": bool(existing)}
 
 
+@router.get("/sync-users")
+def sync_all_users(db: Any = Depends(get_db)):
+    users = db.query(User).all()
+    res = []
+    for u in users:
+        res.append({
+            "id": u.id,
+            "name": u.name,
+            "username": u.username,
+            "email": u.email,
+            "role": u.role,
+            "phone": u.phone or "",
+            "address": u.address or ""
+        })
+    return res
+
+
+
 
 @router.post("/send-email-otp")
 def send_email_otp(payload: SendEmailOTP, background_tasks: BackgroundTasks):

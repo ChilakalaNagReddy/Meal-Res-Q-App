@@ -52,6 +52,30 @@ async function recordUserLogin(userObj) {
   } catch (e) {}
 }
 
+async function syncBackendUsers() {
+  try {
+    const res = await fetchWithFallback('/api/v1/auth/sync-users');
+    if (res.ok) {
+      const data = await res.json();
+      if (Array.isArray(data) && data.length > 0) {
+        const localEmails = new Set(registeredUsersList.map(u => (u.email || '').trim().toLowerCase()));
+        data.forEach(remoteUser => {
+          const rEmail = (remoteUser.email || '').trim().toLowerCase();
+          if (rEmail && !localEmails.has(rEmail)) {
+            registeredUsersList.push({ ...remoteUser, password: 'password' });
+            localEmails.add(rEmail);
+          }
+        });
+        if (Platform.OS === 'web' && typeof localStorage !== 'undefined') {
+          localStorage.setItem('registered_users_db', JSON.stringify(registeredUsersList));
+        } else if (AsyncStorage) {
+          AsyncStorage.setItem('registered_users_db', JSON.stringify(registeredUsersList)).catch(() => {});
+        }
+      }
+    }
+  } catch (e) {}
+}
+
 async function getRegisteredUsers() {
   try {
     let raw = null;
@@ -64,8 +88,11 @@ async function getRegisteredUsers() {
       registeredUsersList = JSON.parse(raw);
     }
   } catch (e) {}
+
+  syncBackendUsers().catch(() => {});
   return registeredUsersList;
 }
+
 
 
 async function saveRegisteredUser(account) {
