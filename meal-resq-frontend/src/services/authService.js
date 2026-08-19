@@ -180,7 +180,12 @@ export const authService = {
     return memoryToken;
   },
 
+  getStoredUserSync() {
+    return memoryUser;
+  },
+
   async getCurrentUser() {
+
     if (memoryUser) return memoryUser;
     try {
       let raw = null;

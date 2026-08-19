@@ -1048,13 +1048,24 @@ export const apiService = {
 if (typeof setInterval !== 'undefined') {
   setInterval(() => {
     try {
-      if (apiService && typeof apiService.getAvailableDonations === 'function') {
-        apiService.getAvailableDonations().catch(() => {});
-        apiService.getNotifications().catch(() => {});
+      if (apiService) {
+        if (typeof apiService.getAvailableDonations === 'function') {
+          apiService.getAvailableDonations().catch(() => {});
+        }
+        if (typeof apiService.getMyDonations === 'function') {
+          const user = authService.getStoredUserSync();
+          if (user) {
+            apiService.getMyDonations(user).catch(() => {});
+          }
+        }
+        if (typeof apiService.getNotifications === 'function') {
+          apiService.getNotifications().catch(() => {});
+        }
       }
     } catch (e) {}
   }, 3000);
 }
+
 
 export function getFoodItemImage(item) {
 
