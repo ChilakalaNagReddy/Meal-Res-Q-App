@@ -1,7 +1,14 @@
-import 'react-native-gesture-handler';
-import { GestureHandlerRootView } from 'react-native-gesture-handler';
 import React, { useState, useEffect } from 'react';
 import { View, Text, TouchableOpacity, ActivityIndicator, StyleSheet, StatusBar, Platform } from 'react-native';
+
+let GestureHandlerRootView = View;
+try {
+  const gh = require('react-native-gesture-handler');
+  if (gh && gh.GestureHandlerRootView) {
+    GestureHandlerRootView = gh.GestureHandlerRootView;
+  }
+} catch (e) {}
+
 import { NavigationContainer } from '@react-navigation/native';
 import { createStackNavigator } from '@react-navigation/stack';
 import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
