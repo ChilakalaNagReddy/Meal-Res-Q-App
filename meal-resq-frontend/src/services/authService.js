@@ -138,7 +138,7 @@ export async function fetchWithFallback(endpointPath, options = {}) {
   for (const base of uniqueUrls) {
     try {
       const controller = new AbortController();
-      const timeoutId = setTimeout(() => controller.abort(), 1200);
+      const timeoutId = setTimeout(() => controller.abort(), 5000);
       const url = `${base}${endpointPath}`;
       const response = await fetch(url, { ...options, signal: controller.signal });
       clearTimeout(timeoutId);
@@ -153,6 +153,7 @@ export async function fetchWithFallback(endpointPath, options = {}) {
   }
   throw lastError || new Error('Network request failed across host URLs.');
 }
+
 
 
 
