@@ -752,6 +752,10 @@ export const apiService = {
     const donorEmail = targetItem ? targetItem.donor_email : null;
     const donorName = targetItem ? targetItem.donor_name : null;
 
+    const claimerName = claimerUser?.name || claimerUser?.username || 'Community Partner';
+    const claimerPhone = claimerUser?.phone || '+91 9876543210';
+    const claimerRole = claimerUser?.role ? claimerUser.role.toUpperCase() : 'RECEIVER';
+
     localDonationsStore = localDonationsStore.map(item => {
       if (String(item.id) === String(id)) {
         return {
@@ -769,6 +773,7 @@ export const apiService = {
       }
       return item;
     });
+
 
     localNotificationsStore = [
       {

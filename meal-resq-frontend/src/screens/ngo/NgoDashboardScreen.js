@@ -58,10 +58,12 @@ export function NgoDashboardScreen({ navigation, user, onLogout }) {
 
 
   const handleClaim = async (id) => {
+    setAvailableDonations(prev => prev.filter(d => String(d.id) !== String(id)));
+    setActiveTab('history');
     await apiService.acceptDonation(id, user);
     fetchData();
-    setActiveTab('history');
   };
+
 
   return (
     <MobileAppFrame>

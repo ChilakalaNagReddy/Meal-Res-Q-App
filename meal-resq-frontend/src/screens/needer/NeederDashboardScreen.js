@@ -59,10 +59,12 @@ export function NeederDashboardScreen({ navigation, user, onLogout }) {
 
 
   const handleReserve = async (id) => {
+    setFoodItems(prev => prev.filter(d => String(d.id) !== String(id)));
+    setActiveTab('history');
     await apiService.reserveFood(id, user);
     fetchFood();
-    setActiveTab('history');
   };
+
 
   return (
     <MobileAppFrame>
