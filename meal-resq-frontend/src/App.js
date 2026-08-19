@@ -271,22 +271,21 @@ class ErrorBoundary extends React.Component {
 }
 
 export default function App() {
-  const content = (
+  return (
     <ErrorBoundary>
-      <ThemeProvider>
-        <LanguageProvider>
-          <MainAppContent />
-        </LanguageProvider>
-      </ThemeProvider>
+      <View style={{ flex: 1, backgroundColor: '#0b1329' }}>
+        <GestureHandlerRootView style={{ flex: 1 }}>
+          <ThemeProvider>
+            <LanguageProvider>
+              <MainAppContent />
+            </LanguageProvider>
+          </ThemeProvider>
+        </GestureHandlerRootView>
+      </View>
     </ErrorBoundary>
   );
-
-  if (Platform.OS === 'web') {
-    return <View style={{ flex: 1, minHeight: '100vh', width: '100%' }}>{content}</View>;
-  }
-
-  return <GestureHandlerRootView style={{ flex: 1 }}>{content}</GestureHandlerRootView>;
 }
+
 
 const styles = StyleSheet.create({
   loadingContainer: {
