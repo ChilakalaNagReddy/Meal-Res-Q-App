@@ -215,15 +215,6 @@ if (Platform.OS === 'web' && typeof window !== 'undefined' && typeof window.addE
   });
 }
 
-// 3-Second Live Real-Time Auto-Polling Loop (Syncs Web & Mobile App)
-if (typeof setInterval !== 'undefined') {
-  setInterval(() => {
-    try {
-      apiService.getAvailableDonations().catch(() => {});
-      apiService.getNotifications().catch(() => {});
-    } catch (e) {}
-  }, 3000);
-}
 
 
 
@@ -1030,7 +1021,20 @@ export const apiService = {
   },
 };
 
+// 3-Second Live Real-Time Auto-Polling Loop (Syncs Web & Mobile App)
+if (typeof setInterval !== 'undefined') {
+  setInterval(() => {
+    try {
+      if (apiService && typeof apiService.getAvailableDonations === 'function') {
+        apiService.getAvailableDonations().catch(() => {});
+        apiService.getNotifications().catch(() => {});
+      }
+    } catch (e) {}
+  }, 3000);
+}
+
 export function getFoodItemImage(item) {
+
   if (!item) return 'https://images.unsplash.com/photo-1504674900247-0877df9cc836?w=800&auto=format&fit=crop&q=80';
   
   const customImg = item.food_image || item.image_url || item.donation?.food_image || item.donation?.image_url;
