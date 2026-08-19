@@ -680,26 +680,14 @@ export const apiService = {
       if (res && res.ok) {
         const data = await res.json();
         if (Array.isArray(data)) {
-          const remoteIds = new Set(data.map(d => String(d.id)));
-          const remoteKeys = new Set(data.map(d => `${d.food_name}_${d.quantity}_${d.pickup_address}`));
-
-          const localOnly = localDonationsStore.filter(d => {
-            if (d.status !== 'available') return false;
+          const pendingTempItems = localDonationsStore.filter(d => {
             const idStr = String(d.id);
-            if (remoteIds.has(idStr)) return false;
-            
-            const matchKey = `${d.food_name}_${d.quantity}_${d.pickup_address}`;
-            if (remoteKeys.has(matchKey)) return false;
-
-            const isTemp = idStr.startsWith('temp_') || d.temp_id || d.is_optimistic;
-            const isRecent = d.posted_timestamp && (Date.now() - d.posted_timestamp < 120000);
-            if (isTemp || isRecent) return true;
-
-            return false;
+            return (idStr.startsWith('temp_') || d.temp_id || d.is_optimistic) && (Date.now() - (d.posted_timestamp || 0) < 15000);
           });
 
           const formattedRemote = data.map(d => ({
             id: d.id,
+            donor_id: d.donor_id,
             created_at: d.created_at ? `🕒 Posted at ${new Date(d.created_at).toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'})}` : '🕒 Posted Today',
             posted_at: d.created_at ? `🕒 Posted at ${new Date(d.created_at).toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'})}` : '🕒 Posted Today',
             posted_timestamp: d.created_at ? new Date(d.created_at).getTime() : Date.now(),
@@ -713,14 +701,14 @@ export const apiService = {
             food_image: d.food_image,
             donor_name: d.donor_name || 'Food Donor',
             donor_phone: d.donor_phone || '',
+            claimed_by_id: d.claimed_by_id || null,
             claimed_by_name: d.claimed_by_name || null,
             claimed_by_phone: d.claimed_by_phone || null,
             claimed_by_role: d.claimed_by_role || null,
             status: d.status || 'available',
           }));
 
-
-          const combined = [...formattedRemote, ...localOnly];
+          const combined = [...pendingTempItems, ...formattedRemote];
           const seen = new Set();
           localDonationsStore = combined.filter(d => {
             if (deletedDonationIdsSet.has(String(d.id))) return false;
@@ -729,12 +717,13 @@ export const apiService = {
             seen.add(k);
             return true;
           });
+
           saveDonationsToStorage();
           notifyDonationChange();
         }
       }
     } catch (e) {
-      console.warn('getAvailableDonations remote fetch error:', e);
+      console.warn('getAvailableDonations remote fetch note:', e);
     }
 
     return localDonationsStore.filter(d => d.status === 'available' && !deletedDonationIdsSet.has(String(d.id)));
