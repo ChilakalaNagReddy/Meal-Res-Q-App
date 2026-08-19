@@ -466,55 +466,38 @@ def login(credentials: UserLogin, db: Any = Depends(get_db)):
         "admin": "System Admin"
     }
 
-    # 1. Exact match for login_id AND requested role
+    # 1. Strict match for login_id AND requested role
     user = db.query(User).filter(
         (User.email == login_id) | (User.username == login_id),
         User.role == target_role
     ).first()
     
-    # 2. If not found for target role, check if email is registered under another role
+    # 2. If not found under target role, strictly reject login with clear role mismatch error
     if not user:
         any_user = db.query(User).filter(
             (User.email == login_id) | (User.username == login_id)
         ).first()
 
-        if any_user and verify_password(credentials.password, any_user.password_hash):
-            user = any_user
-        elif any_user:
+        if any_user:
             registered_label = role_labels.get(any_user.role, any_user.role)
+            target_label = role_labels.get(target_role, target_role)
             raise HTTPException(
                 status_code=status.HTTP_401_UNAUTHORIZED,
-                detail=f"⚠️ Role Mismatch! This account is registered as '{registered_label}'. Please select '{registered_label}' or enter your valid password to sign in."
+                detail=f"⚠️ Role Mismatch! This email is registered under '{registered_label}'. Please select the '{registered_label}' role card to log in, or sign up as '{target_label}'."
             )
         else:
-            # Check for similar emails (e.g. rr9254639 vs rr9254693)
-            all_users = db.query(User).all()
-            suggestion = None
-            for u in all_users:
-                u_email = (u.email or "").strip().lower()
-                if u_email and len(u_email) == len(login_id):
-                    diff = sum(1 for a, b in zip(u_email, login_id) if a != b)
-                    if diff <= 2:
-                        suggestion = u_email
-                        break
-            
-            if suggestion:
-                raise HTTPException(
-                    status_code=status.HTTP_401_UNAUTHORIZED,
-                    detail=f"⚠️ Account Not Found! Did you mean '{suggestion}'? Please check your email address spelling."
-                )
-            else:
-                target_label = role_labels.get(target_role, target_role)
-                raise HTTPException(
-                    status_code=status.HTTP_401_UNAUTHORIZED,
-                    detail=f"⚠️ Account Not Found! No account registered under email '{login_id}'. Please sign up first."
-                )
+            target_label = role_labels.get(target_role, target_role)
+            raise HTTPException(
+                status_code=status.HTTP_401_UNAUTHORIZED,
+                detail=f"⚠️ Account Not Found! No account registered as '{target_label}' under email '{login_id}'. Please sign up first."
+            )
 
     if not verify_password(credentials.password, user.password_hash):
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
             detail="⚠️ Incorrect password! Please check your password and try again."
         )
+
 
 
     
