@@ -129,7 +129,7 @@ function formatErrorMessage(detail, fallback) {
   return String(detail);
 }
 
-// Multi-endpoint fallback fetch helper
+// Multi-endpoint fast fallback fetch helper
 export async function fetchWithFallback(endpointPath, options = {}) {
   const baseUrls = [AppConstants.baseUrl, ...AppConstants.fallbackUrls];
   const uniqueUrls = [...new Set(baseUrls.filter(Boolean))];
@@ -138,21 +138,22 @@ export async function fetchWithFallback(endpointPath, options = {}) {
   for (const base of uniqueUrls) {
     try {
       const controller = new AbortController();
-      const timeoutId = setTimeout(() => controller.abort(), 8000);
+      const timeoutId = setTimeout(() => controller.abort(), 1200);
       const url = `${base}${endpointPath}`;
       const response = await fetch(url, { ...options, signal: controller.signal });
       clearTimeout(timeoutId);
 
       if (response && (response.ok || response.status < 500)) {
-        AppConstants.baseUrl = base; // Save working active server URL
+        AppConstants.baseUrl = base; // Cache working active server URL
         return response;
       }
     } catch (err) {
       lastError = err;
     }
   }
-  throw lastError || new Error('Network request failed across all host URLs.');
+  throw lastError || new Error('Network request failed across host URLs.');
 }
+
 
 
 export const authService = {
