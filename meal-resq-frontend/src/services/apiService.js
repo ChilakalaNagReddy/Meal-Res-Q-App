@@ -585,11 +585,21 @@ export const apiService = {
     return localDonationsStore.filter(d => {
       if (!d || deletedDonationIdsSet.has(String(d.id))) return false;
       if (currentUser.role === 'donor') {
-        return d.donor_id === currentUser.id || d.donor_name === currentUser.name || d.donor_email === currentUser.email;
+        const uId = String(currentUser.id || '');
+        const uName = (currentUser.name || '').trim().toLowerCase();
+        const uEmail = (currentUser.email || '').trim().toLowerCase();
+        const uPhone = (currentUser.phone || '').trim();
+
+        const isIdMatch = uId && String(d.donor_id) === uId;
+        const isNameMatch = uName && d.donor_name && d.donor_name.trim().toLowerCase() === uName;
+        const isEmailMatch = uEmail && d.donor_email && d.donor_email.trim().toLowerCase() === uEmail;
+        const isPhoneMatch = uPhone && d.donor_phone && d.donor_phone.trim() === uPhone;
+        return isIdMatch || isNameMatch || isEmailMatch || isPhoneMatch;
       }
       return true;
     });
   },
+
 
   getAvailableDonationsSync() {
     loadDonationsFromStorage();
