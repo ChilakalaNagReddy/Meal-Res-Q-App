@@ -11,6 +11,9 @@ jobs:
   security-assessment:
     name: DevSecOps SAST, DAST & Dependency Scanning
     runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: meal-resq-backend
 
     steps:
       - name: 📥 Checkout Repository Code
@@ -50,4 +53,4 @@ jobs:
         uses: actions/upload-artifact@v4
         with:
           name: Vulnerability-Test-Results
-          path: Vulnerability Test Results/
+          path: meal-resq-backend/Vulnerability Test Results/

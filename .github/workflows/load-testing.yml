@@ -33,7 +33,7 @@ jobs:
         run: |
           PYTHONPATH=. python -m uvicorn app.main:app --host 127.0.0.1 --port 8000 &
           SERVER_PID=$!
-          sleep 4
+          sleep 5
           python load-tests/run_load_test.py || true
           kill $SERVER_PID || true
 

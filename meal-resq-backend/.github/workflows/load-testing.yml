@@ -11,6 +11,9 @@ jobs:
   load-testing:
     name: Baseline API Load Testing (100 Users, 1 Min)
     runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: meal-resq-backend
 
     steps:
       - name: 📥 Checkout Repository Code
@@ -28,15 +31,10 @@ jobs:
 
       - name: ⚡ Run Baseline API Load Test (100 Virtual Users)
         run: |
-          # Start FastAPI Server in Background
           PYTHONPATH=. python -m uvicorn app.main:app --host 127.0.0.1 --port 8000 &
           SERVER_PID=$!
-          sleep 4
-
-          # Execute 100 Virtual Users Load Test
+          sleep 5
           python load-tests/run_load_test.py || true
-
-          # Cleanup background server
           kill $SERVER_PID || true
 
       - name: 📊 Publish Load Test Job Summary
@@ -59,4 +57,4 @@ jobs:
         uses: actions/upload-artifact@v4
         with:
           name: load-test-results
-          path: load-tests/load-test-results.xlsx
+          path: meal-resq-backend/load-tests/load-test-results.xlsx
