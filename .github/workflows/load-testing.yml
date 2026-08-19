@@ -58,3 +58,5 @@ jobs:
         with:
           name: load-test-results
           path: meal-resq-backend/load-tests/load-test-results.xlsx
+
+# Trigger clean run
