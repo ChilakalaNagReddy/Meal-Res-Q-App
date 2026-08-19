@@ -373,21 +373,28 @@ export const apiService = {
       if (!userObj) return true;
 
       const role = (userObj.role || 'donor').toLowerCase();
-      const uPhone = userObj.phone || '';
-      const uName = userObj.name || '';
+      const uPhone = (userObj.phone || '').trim();
+      const uName = (userObj.name || '').trim().toLowerCase();
+      const uEmail = (userObj.email || '').trim().toLowerCase();
+      const uId = String(userObj.id || '');
 
       if (role === 'donor') {
-        // Show if current donor posted it
-        return item.donor_phone === uPhone || item.donor_name === uName || !item.donor_phone;
+        // Strictly show ONLY if current donor posted it
+        const isIdMatch = uId && String(item.donor_id) === uId;
+        const isNameMatch = uName && item.donor_name && item.donor_name.trim().toLowerCase() === uName;
+        const isEmailMatch = uEmail && item.donor_email && item.donor_email.trim().toLowerCase() === uEmail;
+        const isPhoneMatch = uPhone && item.donor_phone && item.donor_phone.trim() === uPhone;
+        return isIdMatch || isNameMatch || isEmailMatch || isPhoneMatch;
       } else {
-        // Show if current role/user claimed it
-        return (
-          item.claimed_by_phone === uPhone ||
-          item.claimed_by_name === uName ||
-          (item.claimed_by_role && item.claimed_by_role.toLowerCase().includes(role))
-        );
+        // Strictly show ONLY if current user personally claimed it
+        const isIdMatch = uId && String(item.claimed_by_id) === uId;
+        const isEmailMatch = uEmail && item.claimed_by_email && item.claimed_by_email.trim().toLowerCase() === uEmail;
+        const isPhoneMatch = uPhone && item.claimed_by_phone && item.claimed_by_phone.trim() === uPhone;
+        const isNameMatch = uName && item.claimed_by_name && item.claimed_by_name.trim().toLowerCase() === uName;
+        return isIdMatch || isEmailMatch || isPhoneMatch || isNameMatch;
       }
     });
+
 
     const grouped = {
       Today: [],
@@ -611,8 +618,9 @@ export const apiService = {
             description: d.description,
             image_url: d.food_image,
             food_image: d.food_image,
-            donor_name: d.donor_name || 'Food Donor',
-            donor_phone: d.donor_phone || '',
+            donor_name: d.donor_name || currentUser?.name || 'Food Donor',
+            donor_phone: d.donor_phone || currentUser?.phone || '',
+            donor_email: d.donor_email || currentUser?.email || '',
             claimed_by_name: d.claimed_by_name || null,
             claimed_by_phone: d.claimed_by_phone || null,
             claimed_by_role: d.claimed_by_role || null,
@@ -629,13 +637,23 @@ export const apiService = {
     }
 
     if (currentUser) {
+      const uId = String(currentUser.id || '');
+      const uName = (currentUser.name || '').trim().toLowerCase();
+      const uEmail = (currentUser.email || '').trim().toLowerCase();
+      const uPhone = (currentUser.phone || '').trim();
+
       return localDonationsStore.filter(d => {
         if (!d || deletedDonationIdsSet.has(String(d.id))) return false;
-        return d.donor_id === currentUser.id || d.donor_name === currentUser.name || d.donor_email === currentUser.email;
+        const isIdMatch = uId && String(d.donor_id) === uId;
+        const isNameMatch = uName && d.donor_name && d.donor_name.trim().toLowerCase() === uName;
+        const isEmailMatch = uEmail && d.donor_email && d.donor_email.trim().toLowerCase() === uEmail;
+        const isPhoneMatch = uPhone && d.donor_phone && d.donor_phone.trim() === uPhone;
+        return isIdMatch || isNameMatch || isEmailMatch || isPhoneMatch;
       });
     }
     return localDonationsStore.filter(d => !deletedDonationIdsSet.has(String(d.id)));
   },
+
 
   async getDonorDonations(currentUser) {
     return this.getMyDonations(currentUser);
