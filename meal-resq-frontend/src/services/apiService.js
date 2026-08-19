@@ -1054,7 +1054,7 @@ export const apiService = {
   },
 };
 
-// 3-Second Live Real-Time Auto-Polling Loop (Syncs Web & Mobile App)
+// 1.5-Second Live Real-Time Auto-Polling Loop (Syncs Web & Mobile App Instantly)
 if (typeof setInterval !== 'undefined') {
   setInterval(() => {
     try {
@@ -1073,8 +1073,9 @@ if (typeof setInterval !== 'undefined') {
         }
       }
     } catch (e) {}
-  }, 3000);
+  }, 1500);
 }
+
 
 
 export function getFoodItemImage(item) {

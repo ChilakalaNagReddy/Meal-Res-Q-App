@@ -278,7 +278,7 @@ export const authService = {
       }
     }
 
-    const list = await getRegisteredUsers();
+    const list = registeredUsersList;
 
     // Check if account exists under target role vs any role
     const registeredAccountForRole = list.find(
@@ -295,6 +295,7 @@ export const authService = {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ login_id: loginId, password, role: cleanRole }),
       });
+
 
       const data = await response.json();
       if (response.ok) {
