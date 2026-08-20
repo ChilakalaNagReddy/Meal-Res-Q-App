@@ -4,20 +4,24 @@ import Constants from 'expo-constants';
 const getInitialBaseUrl = () => {
   if (Platform.OS === 'web' && typeof window !== 'undefined') {
     const host = window.location.hostname || 'localhost';
-    return `http://${host}:8000`;
+    if (host === 'localhost' || host === '127.0.0.1' || host.startsWith('192.168.') || host.startsWith('10.')) {
+      return `http://${host}:8000`;
+    }
+    return 'http://10.239.19.5:8000';
   }
 
-  // Extract host IP dynamically from Expo manifest (e.g. 10.239.19.5)
+  // Extract host IP dynamically from Expo manifest
   const hostUri = Constants.expoConfig?.hostUri || Constants.manifest?.debuggerHost || Constants.manifest2?.extra?.expoGo?.developer?.tool;
   if (hostUri) {
     const ip = hostUri.split(':')[0];
-    if (ip && ip !== 'localhost' && ip !== '127.0.0.1') {
+    if (ip && ip !== 'localhost' && ip !== '127.0.0.1' && !ip.includes('exp.direct')) {
       return `http://${ip}:8000`;
     }
   }
 
   return 'http://10.239.19.5:8000';
 };
+
 
 export const AppConstants = {
   baseUrl: getInitialBaseUrl(),
