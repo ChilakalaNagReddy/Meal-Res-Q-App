@@ -615,7 +615,6 @@ export const apiService = {
   },
 
   async createDonation(donationData) {
-
     const newItem = this.addOptimisticDonation(donationData);
     try {
       const headers = await authHeaders();
@@ -640,14 +639,22 @@ export const apiService = {
           await this.syncAllDonationsFromBackend();
           saveDonationsToStorage();
           notifyDonationChange();
+          return newItem;
         }
       }
-
+      // Purge temporary item if backend save failed
+      localDonationsStore = localDonationsStore.filter(d => String(d.id) !== String(newItem.id));
+      saveDonationsToStorage();
+      notifyDonationChange();
     } catch (e) {
       console.warn('Sync createDonation error:', e);
+      localDonationsStore = localDonationsStore.filter(d => String(d.id) !== String(newItem.id));
+      saveDonationsToStorage();
+      notifyDonationChange();
     }
     return newItem;
   },
+
 
 
 
