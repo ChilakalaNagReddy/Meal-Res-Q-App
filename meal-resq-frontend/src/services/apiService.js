@@ -12,6 +12,40 @@ async function authHeaders() {
   };
 }
 
+export function parseBackendDate(dateStr) {
+  if (!dateStr) return new Date();
+  if (typeof dateStr === 'number') return new Date(dateStr);
+
+  let s = String(dateStr).trim();
+  if (s.includes(' ') && !s.includes('T')) {
+    s = s.replace(' ', 'T');
+  }
+  const d = new Date(s);
+  if (!isNaN(d.getTime())) return d;
+  return new Date();
+}
+
+export function formatExactDateAndTime(dateObj) {
+  const d = parseBackendDate(dateObj);
+  const now = new Date();
+  const todayStr = now.toDateString();
+  const yesterday = new Date(now);
+  yesterday.setDate(now.getDate() - 1);
+  const yesterdayStr = yesterday.toDateString();
+
+  const timeStr = d.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+  const dStr = d.toDateString();
+
+  if (dStr === todayStr) {
+    return `🕒 Today at ${timeStr}`;
+  } else if (dStr === yesterdayStr) {
+    return `🕒 Yesterday at ${timeStr}`;
+  } else {
+    const dateFormatted = d.toLocaleDateString('en-US', { day: 'numeric', month: 'short', year: 'numeric' });
+    return `🕒 ${dateFormatted} at ${timeStr}`;
+  }
+}
+
 const formatCurrentTime = () => {
   try {
     return new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
@@ -19,6 +53,7 @@ const formatCurrentTime = () => {
     return '11:40 AM';
   }
 };
+
 
 let localDonationsStore = [];
 let deletedDonationIdsSet = new Set();
@@ -408,8 +443,10 @@ export const apiService = {
     const yesterdayStr = yesterday.toDateString();
 
     historyList.forEach(item => {
-      const itemDate = item.claimed_at ? new Date(item.claimed_at) : new Date(item.timestamp || Date.now());
+      const rawDate = item.claimed_at || item.created_at_raw || item.posted_timestamp || item.created_at || item.timestamp;
+      const itemDate = parseBackendDate(rawDate);
       const itemDateStr = itemDate.toDateString();
+
 
       if (itemDateStr === todayStr) {
         grouped.Today.push(item);
@@ -614,28 +651,34 @@ export const apiService = {
       if (res && res.ok) {
         const data = await res.json();
         if (Array.isArray(data)) {
-          const formattedRemote = data.map(d => ({
-            id: d.id,
-            donor_id: d.donor_id,
-            created_at: d.created_at ? `🕒 Posted at ${new Date(d.created_at).toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'})}` : '🕒 Posted Today',
-            posted_at: d.created_at ? `🕒 Posted at ${new Date(d.created_at).toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'})}` : '🕒 Posted Today',
-            posted_timestamp: d.created_at ? new Date(d.created_at).getTime() : Date.now(),
-            food_name: d.food_name,
-            quantity: d.quantity,
-            category: d.category,
-            expiry_time: d.expiry_time,
-            pickup_address: d.pickup_address,
-            description: d.description,
-            image_url: d.food_image,
-            food_image: d.food_image,
-            donor_name: d.donor_name || currentUser?.name || 'Food Donor',
-            donor_phone: d.donor_phone || currentUser?.phone || '',
-            donor_email: d.donor_email || currentUser?.email || '',
-            claimed_by_name: d.claimed_by_name || null,
-            claimed_by_phone: d.claimed_by_phone || null,
-            claimed_by_role: d.claimed_by_role || null,
-            status: d.status || 'available',
-          }));
+          const formattedRemote = data.map(d => {
+            const dateObj = parseBackendDate(d.created_at);
+            const exactFormattedStr = formatExactDateAndTime(dateObj);
+            return {
+              id: d.id,
+              donor_id: d.donor_id,
+              created_at: exactFormattedStr,
+              posted_at: exactFormattedStr,
+              created_at_raw: d.created_at,
+              posted_timestamp: dateObj.getTime(),
+              food_name: d.food_name,
+              quantity: d.quantity,
+              category: d.category,
+              expiry_time: d.expiry_time,
+              pickup_address: d.pickup_address,
+              description: d.description,
+              image_url: d.food_image,
+              food_image: d.food_image,
+              donor_name: d.donor_name || currentUser?.name || 'Food Donor',
+              donor_phone: d.donor_phone || currentUser?.phone || '',
+              donor_email: d.donor_email || currentUser?.email || '',
+              claimed_by_name: d.claimed_by_name || null,
+              claimed_by_phone: d.claimed_by_phone || null,
+              claimed_by_role: d.claimed_by_role || null,
+              status: d.status || 'available',
+            };
+          });
+
 
           const remoteMap = new Map(formattedRemote.map(item => [String(item.id), item]));
           const otherItems = localDonationsStore.filter(localItem => !remoteMap.has(String(localItem.id)));
@@ -707,28 +750,34 @@ export const apiService = {
             return (idStr.startsWith('temp_') || d.temp_id || d.is_optimistic) && (Date.now() - (d.posted_timestamp || 0) < 15000);
           });
 
-          const formattedRemote = data.map(d => ({
-            id: d.id,
-            donor_id: d.donor_id,
-            created_at: d.created_at ? `🕒 Posted at ${new Date(d.created_at).toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'})}` : '🕒 Posted Today',
-            posted_at: d.created_at ? `🕒 Posted at ${new Date(d.created_at).toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'})}` : '🕒 Posted Today',
-            posted_timestamp: d.created_at ? new Date(d.created_at).getTime() : Date.now(),
-            food_name: d.food_name,
-            quantity: d.quantity,
-            category: d.category,
-            expiry_time: d.expiry_time,
-            pickup_address: d.pickup_address,
-            description: d.description,
-            image_url: d.food_image,
-            food_image: d.food_image,
-            donor_name: d.donor_name || 'Food Donor',
-            donor_phone: d.donor_phone || '',
-            claimed_by_id: d.claimed_by_id || null,
-            claimed_by_name: d.claimed_by_name || null,
-            claimed_by_phone: d.claimed_by_phone || null,
-            claimed_by_role: d.claimed_by_role || null,
-            status: d.status || 'available',
-          }));
+          const formattedRemote = data.map(d => {
+            const dateObj = parseBackendDate(d.created_at);
+            const exactFormattedStr = formatExactDateAndTime(dateObj);
+            return {
+              id: d.id,
+              donor_id: d.donor_id,
+              created_at: exactFormattedStr,
+              posted_at: exactFormattedStr,
+              created_at_raw: d.created_at,
+              posted_timestamp: dateObj.getTime(),
+              food_name: d.food_name,
+              quantity: d.quantity,
+              category: d.category,
+              expiry_time: d.expiry_time,
+              pickup_address: d.pickup_address,
+              description: d.description,
+              image_url: d.food_image,
+              food_image: d.food_image,
+              donor_name: d.donor_name || 'Food Donor',
+              donor_phone: d.donor_phone || '',
+              claimed_by_id: d.claimed_by_id || null,
+              claimed_by_name: d.claimed_by_name || null,
+              claimed_by_phone: d.claimed_by_phone || null,
+              claimed_by_role: d.claimed_by_role || null,
+              status: d.status || 'available',
+            };
+          });
+
 
           const combined = [...pendingTempItems, ...formattedRemote];
           const seen = new Set();
