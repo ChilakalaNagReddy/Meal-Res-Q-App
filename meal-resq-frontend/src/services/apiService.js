@@ -645,7 +645,9 @@ export const apiService = {
 
   async getMyDonations(currentUser) {
     loadDonationsFromStorage();
+    await this.syncAllDonationsFromBackend();
     try {
+
       const headers = await authHeaders();
       const res = await fetchWithFallback('/api/v1/donor/donations', { headers });
       if (res && res.ok) {
@@ -736,9 +738,57 @@ export const apiService = {
     return { success: true };
   },
 
+  async syncAllDonationsFromBackend() {
+    try {
+      const headers = await authHeaders();
+      const res = await fetchWithFallback('/api/v1/ngo/all-donations', { headers });
+      if (res && res.ok) {
+        const data = await res.json();
+        if (Array.isArray(data)) {
+          const formattedRemote = data.map(d => {
+            const dateObj = parseBackendDate(d.created_at);
+            const exactFormattedStr = formatExactDateAndTime(dateObj);
+            return {
+              id: d.id,
+              donor_id: d.donor_id,
+              created_at: exactFormattedStr,
+              posted_at: exactFormattedStr,
+              created_at_raw: d.created_at,
+              posted_timestamp: dateObj.getTime(),
+              food_name: d.food_name,
+              quantity: d.quantity,
+              category: d.category,
+              expiry_time: d.expiry_time,
+              pickup_address: d.pickup_address,
+              description: d.description,
+              image_url: d.food_image,
+              food_image: d.food_image,
+              donor_name: d.donor_name || 'Food Donor',
+              donor_phone: d.donor_phone || '',
+              claimed_by_id: d.claimed_by_id || null,
+              claimed_by_name: d.claimed_by_name || null,
+              claimed_by_phone: d.claimed_by_phone || null,
+              claimed_by_role: d.claimed_by_role || null,
+              status: d.status || 'available',
+            };
+          });
+
+          const pendingTemp = localDonationsStore.filter(d => String(d.id).startsWith('temp_'));
+          localDonationsStore = [...pendingTemp, ...formattedRemote];
+          saveDonationsToStorage();
+          notifyDonationChange();
+        }
+      }
+    } catch (e) {
+      console.warn('syncAllDonationsFromBackend error:', e);
+    }
+  },
+
   // NGO & Needer Endpoints
   async getAvailableDonations() {
     loadDonationsFromStorage();
+    await this.syncAllDonationsFromBackend();
+
     try {
       const headers = await authHeaders();
       const res = await fetchWithFallback('/api/v1/ngo/available-donations', { headers });

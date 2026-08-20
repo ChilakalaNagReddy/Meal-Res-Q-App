@@ -39,6 +39,35 @@ def get_available_donations(db: Any = Depends(get_db)):
         result.append(item)
     return result
 
+@router.get("/all-donations", response_model=List[DonationOut])
+def get_all_donations(db: Any = Depends(get_db)):
+    donations = db.query(Donation).order_by(Donation.created_at.desc()).all()
+    result = []
+    for d in donations:
+        item = DonationOut.from_orm(d)
+        if d.donor:
+            item.donor_name = d.donor.name
+            item.donor_phone = d.donor.phone
+        if d.pickups and len(d.pickups) > 0:
+            p = d.pickups[-1]
+            if p.ngo and p.ngo.user:
+                item.claimed_by_name = p.ngo.user.name
+                item.claimed_by_phone = p.ngo.user.phone
+                item.claimed_by_role = "NGO Partner"
+            elif p.volunteer and p.volunteer.user:
+                item.claimed_by_name = p.volunteer.user.name
+                item.claimed_by_phone = p.volunteer.user.phone
+                item.claimed_by_role = "Volunteer Driver"
+            elif p.needer_id:
+                needer_user = db.query(User).filter(User.id == p.needer_id).first()
+                if needer_user:
+                    item.claimed_by_name = needer_user.name
+                    item.claimed_by_phone = needer_user.phone
+                    item.claimed_by_role = "Community Member"
+        result.append(item)
+    return result
+
+
 
 
 @router.post("/accept/{donation_id}", response_model=PickupOut)
