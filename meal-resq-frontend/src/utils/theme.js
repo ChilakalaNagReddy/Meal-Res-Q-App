@@ -60,7 +60,52 @@ export const lightColors = {
   warning: '#F59E0B',
 };
 
+export const COLORS = {
+  primary: '#10B981',       // Emerald 500
+  secondary: '#059669',     // Emerald 600
+  background: '#0F172A',    // Slate 900
+  surface: '#1E293B',       // Slate 800
+  surfaceBorder: '#334155', // Slate 700
+  text: '#F8FAFC',          // Slate 50
+  textSecondary: '#94A3B8', // Slate 400
+  muted: '#64748B',         // Slate 500
+  card: '#1E293B',
+  border: '#334155',
+  success: '#10B981',
+  danger: '#EF4444',
+  warning: '#F59E0B',
+  accentDonor: '#3B82F6',
+  accentNgo: '#10B981',
+  accentVol: '#F59E0B',
+  accentNeeder: '#EC4899',
+};
+
+export const SPACING = {
+  xs: 4,
+  sm: 8,
+  md: 16,
+  lg: 24,
+  xl: 32,
+};
+
+export const TYPOGRAPHY = {
+  fontSizeSm: 12,
+  fontSizeMd: 14,
+  fontSizeLg: 18,
+  fontSizeXl: 24,
+  fontWeightBold: '700',
+  fontWeightHeavy: '800',
+};
+
+export const DIMENSIONS = {
+  borderRadiusSm: 8,
+  borderRadiusMd: 12,
+  borderRadiusLg: 16,
+  maxWidthWeb: 1200,
+};
+
 export const colors = { ...darkColors };
+
 
 export function setActiveThemeMode(isDark) {
   const source = isDark ? darkColors : lightColors;
