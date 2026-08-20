@@ -170,7 +170,7 @@ export function AddDonationScreen({ navigation, user, route }) {
     }
   };
 
-  const handleSubmit = () => {
+  const handleSubmit = async () => {
     setErrorMsg('');
     const cleanFoodName = foodName.trim();
     const cleanQty = quantity.trim();
@@ -188,8 +188,9 @@ export function AddDonationScreen({ navigation, user, route }) {
     const donorName = currentUser.name || user?.name || route?.params?.user?.name || 'Kavya (Food Donor)';
     const donorPhone = currentUser.phone || user?.phone || route?.params?.user?.phone || '+91 6304619188';
 
+    setLoading(true);
     try {
-      apiService.addOptimisticDonation({
+      await apiService.createDonation({
         food_name: cleanFoodName,
         quantity: cleanQty,
         category: category || 'Vegetarian',
@@ -200,15 +201,19 @@ export function AddDonationScreen({ navigation, user, route }) {
         food_image: foodImage,
         donor_name: donorName,
         donor_phone: donorPhone,
+        donor_email: currentUser.email || user?.email || '',
       });
     } catch (e) {
       console.warn('Post donation error:', e);
+    } finally {
+      setLoading(false);
     }
 
     if (navigation?.goBack) {
       navigation.goBack();
     }
   };
+
 
 
 
