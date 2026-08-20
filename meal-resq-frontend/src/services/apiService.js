@@ -463,8 +463,18 @@ export const apiService = {
     const yesterdayStr = yesterday.toDateString();
 
     historyList.forEach(item => {
-      const rawDate = item.claimed_at || item.created_at_raw || item.posted_timestamp || item.created_at || item.timestamp;
-      const itemDate = parseBackendDate(rawDate);
+      let itemDate = null;
+      if (item.posted_timestamp && typeof item.posted_timestamp === 'number') {
+        itemDate = new Date(item.posted_timestamp);
+      } else if (item.created_at_raw) {
+        itemDate = parseBackendDate(item.created_at_raw);
+      } else if (item.claimed_at_raw) {
+        itemDate = parseBackendDate(item.claimed_at_raw);
+      } else {
+        const candidate = item.created_at || item.claimed_at || item.timestamp;
+        itemDate = parseBackendDate(candidate);
+      }
+
       const itemDateStr = itemDate.toDateString();
 
       let groupKey = itemDate.toLocaleDateString('en-US', { day: 'numeric', month: 'short', year: 'numeric' });
@@ -481,6 +491,7 @@ export const apiService = {
     });
 
     return grouped;
+
 
   },
 
