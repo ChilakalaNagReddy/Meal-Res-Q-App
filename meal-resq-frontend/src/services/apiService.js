@@ -17,13 +17,31 @@ export function parseBackendDate(dateStr) {
   if (typeof dateStr === 'number') return new Date(dateStr);
 
   let s = String(dateStr).trim();
+  s = s.replace(/^🕒\s*/, '').replace(/^Posted at\s*/i, '').replace(/^Posted Today at\s*/i, '').trim();
+
+  if (s.toLowerCase().startsWith('today')) {
+    return new Date();
+  }
+  if (s.toLowerCase().startsWith('yesterday')) {
+    const d = new Date();
+    d.setDate(d.getDate() - 1);
+    return d;
+  }
+
+  // Handle format like "18 Aug 2026 at 05:18 AM"
+  const cleanS = s.replace(/\bat\b/gi, '').trim();
+  let d = new Date(cleanS);
+  if (!isNaN(d.getTime())) return d;
+
   if (s.includes(' ') && !s.includes('T')) {
     s = s.replace(' ', 'T');
+    d = new Date(s);
+    if (!isNaN(d.getTime())) return d;
   }
-  const d = new Date(s);
-  if (!isNaN(d.getTime())) return d;
+
   return new Date();
 }
+
 
 export function formatExactDateAndTime(dateObj) {
   const d = parseBackendDate(dateObj);
@@ -436,10 +454,7 @@ export const apiService = {
     });
 
 
-    const grouped = {
-      Today: [],
-      Yesterday: [],
-    };
+    const grouped = {};
 
     const now = new Date();
     const todayStr = now.toDateString();
@@ -452,19 +467,21 @@ export const apiService = {
       const itemDate = parseBackendDate(rawDate);
       const itemDateStr = itemDate.toDateString();
 
-
+      let groupKey = itemDate.toLocaleDateString('en-US', { day: 'numeric', month: 'short', year: 'numeric' });
       if (itemDateStr === todayStr) {
-        grouped.Today.push(item);
+        groupKey = 'Today';
       } else if (itemDateStr === yesterdayStr) {
-        grouped.Yesterday.push(item);
-      } else {
-        const dateKey = itemDate.toLocaleDateString('en-US', { day: 'numeric', month: 'short', year: 'numeric' });
-        if (!grouped[dateKey]) grouped[dateKey] = [];
-        grouped[dateKey].push(item);
+        groupKey = 'Yesterday';
       }
+
+      if (!grouped[groupKey]) {
+        grouped[groupKey] = [];
+      }
+      grouped[groupKey].push(item);
     });
 
     return grouped;
+
   },
 
 
@@ -609,10 +626,12 @@ export const apiService = {
         const saved = await res.json();
         if (saved && saved.id) {
           newItem.id = saved.id;
+          await this.syncAllDonationsFromBackend();
           saveDonationsToStorage();
           notifyDonationChange();
         }
       }
+
     } catch (e) {
       console.warn('Sync createDonation error:', e);
     }
