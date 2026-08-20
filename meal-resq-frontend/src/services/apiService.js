@@ -145,9 +145,13 @@ function loadDonationsFromStorage() {
       if (Array.isArray(parsed)) {
         const seenIds = new Set();
         const seenKeys = new Set();
+        const now = Date.now();
         localDonationsStore = parsed.filter(d => {
           if (!d || deletedDonationIdsSet.has(String(d.id))) return false;
           const idStr = String(d.id);
+          if (idStr.startsWith('temp_') && (now - (d.posted_timestamp || 0) > 15000)) {
+            return false;
+          }
           const k = `${d.food_name}_${d.quantity}_${d.pickup_address}`;
           if (seenIds.has(idStr) || (seenKeys.has(k) && idStr.startsWith('temp_'))) return false;
           seenIds.add(idStr);
@@ -156,6 +160,7 @@ function loadDonationsFromStorage() {
         });
       }
     }
+
 
     if (Platform.OS !== 'web' && AsyncStorage) {
       AsyncStorage.getItem('meal_resq_deleted_donations_db').then(del => {
