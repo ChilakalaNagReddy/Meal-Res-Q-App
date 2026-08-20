@@ -4,6 +4,7 @@ import { View, Text, StyleSheet, ScrollView, TouchableOpacity, ActivityIndicator
 import { MobileAppFrame } from '../../components/MobileAppFrame';
 import { UserProfileHeader } from '../../components/UserProfileHeader';
 import { DonationCommunicationModal } from '../../components/DonationCommunicationModal';
+import { DonationDetailsModal } from '../../components/DonationDetailsModal';
 import { useTheme } from '../../context/ThemeContext';
 import { apiService, getFoodItemImage } from '../../services/apiService';
 
@@ -14,10 +15,13 @@ export function NgoDashboardScreen({ navigation, user, onLogout }) {
   const [loading, setLoading] = useState(true);
   const [activeTab, setActiveTab] = useState('available');
 
-  // Communication Modal State
+  // Communication & Details Modal State
   const [commModalVisible, setCommModalVisible] = useState(false);
-  const [commType, setCommType] = useState('chat'); // 'call', 'chat', 'voice'
+  const [detailsModalVisible, setDetailsModalVisible] = useState(false);
+  const [commType, setCommType] = useState('chat'); // 'call', 'chat'
   const [selectedCommItem, setSelectedCommItem] = useState(null);
+  const [selectedDetailsItem, setSelectedDetailsItem] = useState(null);
+
 
 
   useEffect(() => {
@@ -107,23 +111,28 @@ export function NgoDashboardScreen({ navigation, user, onLogout }) {
           ) : (
             availableDonations.map((item) => (
               <View key={item.id} style={[styles.card, { backgroundColor: colors.surface, borderColor: colors.surfaceBorder }]}>
-                <View style={styles.foodImgBox}>
-                  <Image source={{ uri: getFoodItemImage(item) }} style={styles.foodImg} resizeMode="cover" />
-                </View>
+                <TouchableOpacity onPress={() => { setSelectedDetailsItem(item); setDetailsModalVisible(true); }}>
+                  <View style={styles.foodImgBox}>
+                    <Image source={{ uri: getFoodItemImage(item) }} style={styles.foodImg} resizeMode="cover" />
+                  </View>
 
-              <View style={styles.cardHeader}>
-                <Text style={[styles.foodName, { color: colors.textPrimary }]}>{item.food_name}</Text>
-                <Text style={[styles.donorBadge, { color: colors.accentDonor }]}>👤 {item.donor_name || 'Donor'}</Text>
-              </View>
-              <Text style={[styles.detail, { color: colors.textSecondary }]}>📦 Quantity: {item.quantity}</Text>
-              <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginTop: 3 }}>
-                <Text style={[styles.detail, { color: colors.textSecondary, flex: 1 }]}>📍 Location: {item.pickup_address}</Text>
-                <TouchableOpacity onPress={() => apiService.openMapLocation(item.pickup_address)} style={{ backgroundColor: 'rgba(59, 130, 246, 0.15)', paddingHorizontal: 10, paddingVertical: 4, borderRadius: 8 }}>
-                  <Text style={{ color: '#3b82f6', fontSize: 12, fontWeight: '800' }}>📍 Navigate</Text>
+                  <View style={styles.cardHeader}>
+                    <Text style={[styles.foodName, { color: colors.textPrimary }]}>{item.food_name}</Text>
+                    <Text style={[styles.donorBadge, { color: colors.accentDonor }]}>👤 {item.donor_name || 'Donor'}</Text>
+                  </View>
+                  <Text style={[styles.detail, { color: colors.textSecondary }]}>📦 Quantity: {item.quantity}</Text>
+                  <Text style={{ color: colors.primary, fontSize: 12, fontWeight: '700', marginTop: 2 }}>🔍 Tap card to view full details</Text>
                 </TouchableOpacity>
-              </View>
-              <Text style={[styles.detail, { color: colors.textSecondary }]}>📱 Phone: {item.donor_phone || '+91 9876543210'}</Text>
-              <Text style={[styles.detail, { color: colors.primary, fontWeight: '800' }]}>{item.posted_at || item.created_at || '🕒 Posted Today'}</Text>
+
+                <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginTop: 3 }}>
+                  <Text style={[styles.detail, { color: colors.textSecondary, flex: 1 }]}>📍 Location: {item.pickup_address}</Text>
+                  <TouchableOpacity onPress={() => apiService.openMapLocation(item.pickup_address)} style={{ backgroundColor: 'rgba(59, 130, 246, 0.15)', paddingHorizontal: 10, paddingVertical: 4, borderRadius: 8 }}>
+                    <Text style={{ color: '#3b82f6', fontSize: 12, fontWeight: '800' }}>📍 Navigate</Text>
+                  </TouchableOpacity>
+                </View>
+                <Text style={[styles.detail, { color: colors.textSecondary }]}>📱 Phone: {item.donor_phone || '+91 9876543210'}</Text>
+                <Text style={[styles.detail, { color: colors.primary, fontWeight: '800' }]}>{item.posted_at || item.created_at || '🕒 Posted Today'}</Text>
+
 
 
               {/* Call, Chat, Voice Note Communication Action Row */}
@@ -270,9 +279,18 @@ export function NgoDashboardScreen({ navigation, user, onLogout }) {
         onClose={() => setCommModalVisible(false)}
       />
 
+      <DonationDetailsModal
+        visible={detailsModalVisible}
+        item={selectedDetailsItem}
+        onClose={() => setDetailsModalVisible(false)}
+        onAction={handleClaim}
+        actionLabel="⚡ Claim Surplus Food"
+      />
+
     </MobileAppFrame>
   );
 }
+
 
 
 const styles = StyleSheet.create({

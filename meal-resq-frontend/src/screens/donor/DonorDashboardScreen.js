@@ -4,6 +4,7 @@ import { View, Text, StyleSheet, ScrollView, TouchableOpacity, ActivityIndicator
 import { MobileAppFrame } from '../../components/MobileAppFrame';
 import { UserProfileHeader } from '../../components/UserProfileHeader';
 import { DonationCommunicationModal } from '../../components/DonationCommunicationModal';
+import { DonationDetailsModal } from '../../components/DonationDetailsModal';
 import { useTheme } from '../../context/ThemeContext';
 import { useLanguage } from '../../context/LanguageContext';
 import { apiService, getFoodItemImage } from '../../services/apiService';
@@ -19,11 +20,13 @@ export function DonorDashboardScreen({ navigation, user, onLogout }) {
   const activeDonations = donations.filter(d => d && d.status === 'available');
   const historyDonationsCount = donations.filter(d => d && d.status === 'claimed').length;
 
-  // Communication Modal State
-
+  // Communication & Details Modal State
   const [commModalVisible, setCommModalVisible] = useState(false);
+  const [detailsModalVisible, setDetailsModalVisible] = useState(false);
   const [commType, setCommType] = useState('call');
   const [selectedCommItem, setSelectedCommItem] = useState(null);
+  const [selectedDetailsItem, setSelectedDetailsItem] = useState(null);
+
 
 
 
@@ -145,23 +148,26 @@ export function DonorDashboardScreen({ navigation, user, onLogout }) {
           ) : (
             activeDonations.map((item) => (
               <View key={item.id} style={[styles.donationItem, { backgroundColor: colors.surface, borderColor: colors.surfaceBorder }]}>
-                <View style={styles.foodImgBox}>
-                  <Image source={{ uri: getFoodItemImage(item) }} style={styles.foodImg} resizeMode="cover" />
-                </View>
-
-
-                <View style={styles.itemHeader}>
-                  <Text style={[styles.foodTitle, { color: colors.textPrimary }]}>{item.food_name}</Text>
-                  <View style={[styles.statusBadge, { backgroundColor: item.status === 'available' ? 'rgba(16, 185, 129, 0.2)' : 'rgba(59, 130, 246, 0.2)' }]}>
-                    <Text style={{ color: item.status === 'available' ? colors.primary : colors.accentDonor, fontWeight: '700', fontSize: 12 }}>
-                      {item.status.toUpperCase()}
-                    </Text>
+                <TouchableOpacity onPress={() => { setSelectedDetailsItem(item); setDetailsModalVisible(true); }}>
+                  <View style={styles.foodImgBox}>
+                    <Image source={{ uri: getFoodItemImage(item) }} style={styles.foodImg} resizeMode="cover" />
                   </View>
-                </View>
 
-                <Text style={[styles.itemText, { color: colors.textSecondary }]}>📦 Quantity: {item.quantity || '5 kg'} ({item.category || 'Vegetarian'})</Text>
-                <Text style={[styles.itemText, { color: colors.textSecondary, marginTop: 3 }]}>📍 Pickup: {item.pickup_address}</Text>
-                <Text style={[styles.itemText, { color: colors.primary, fontWeight: '800' }]}>{item.posted_at || item.created_at || '🕒 Posted Today'}</Text>
+                  <View style={styles.itemHeader}>
+                    <Text style={[styles.foodTitle, { color: colors.textPrimary }]}>{item.food_name}</Text>
+                    <View style={[styles.statusBadge, { backgroundColor: item.status === 'available' ? 'rgba(16, 185, 129, 0.2)' : 'rgba(59, 130, 246, 0.2)' }]}>
+                      <Text style={{ color: item.status === 'available' ? colors.primary : colors.accentDonor, fontWeight: '700', fontSize: 12 }}>
+                        {item.status.toUpperCase()}
+                      </Text>
+                    </View>
+                  </View>
+
+                  <Text style={[styles.itemText, { color: colors.textSecondary }]}>📦 Quantity: {item.quantity || '5 kg'} ({item.category || 'Vegetarian'})</Text>
+                  <Text style={[styles.itemText, { color: colors.textSecondary, marginTop: 3 }]}>📍 Pickup: {item.pickup_address}</Text>
+                  <Text style={[styles.itemText, { color: colors.primary, fontWeight: '800' }]}>{item.posted_at || item.created_at || '🕒 Posted Today'}</Text>
+                  <Text style={{ color: colors.primary, fontSize: 12, fontWeight: '700', marginTop: 2 }}>🔍 Tap card to view full details</Text>
+                </TouchableOpacity>
+
 
 
                 {item.status === 'claimed' ? (
@@ -288,24 +294,12 @@ export function DonorDashboardScreen({ navigation, user, onLogout }) {
                           💬 Chat {apiService.hasUnreadChat(item.id, 'donor') ? '🔴' : ''}
                         </Text>
                       </TouchableOpacity>
-
-                      <TouchableOpacity
-                        style={[styles.commBtn, { backgroundColor: '#8b5cf6', position: 'relative' }]}
-                        onPress={() => {
-                          setSelectedCommItem({ ...item, phone: item.claimed_by_phone || '+91 9876500000', food_name: item.food_name });
-                          setCommType('voice');
-                          setCommModalVisible(true);
-                        }}
-                      >
-                        <Text style={styles.commBtnText}>
-                          🎙️ Voice Note {apiService.hasUnreadVoice(item.id, 'donor') ? '🔴' : ''}
-                        </Text>
-                      </TouchableOpacity>
                     </View>
                   </View>
                 ))}
               </View>
             ));
+
 
           })()
         )}
@@ -320,9 +314,16 @@ export function DonorDashboardScreen({ navigation, user, onLogout }) {
         onClose={() => setCommModalVisible(false)}
       />
 
+      <DonationDetailsModal
+        visible={detailsModalVisible}
+        item={selectedDetailsItem}
+        onClose={() => setDetailsModalVisible(false)}
+      />
+
     </MobileAppFrame>
   );
 }
+
 
 
 const styles = StyleSheet.create({

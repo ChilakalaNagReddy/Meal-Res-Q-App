@@ -120,8 +120,9 @@ export function DonationCommunicationModal({ visible, type, item, onClose, curre
           {/* Header */}
           <View style={styles.header}>
             <Text style={[styles.title, { color: colors.textPrimary }]}>
-              {type === 'call' ? '📞 Direct Phone Call' : type === 'chat' ? '💬 Live Chat' : '🎙️ Voice Message'}
+              {type === 'call' ? '📞 Direct Phone Call' : '💬 Live Chat'}
             </Text>
+
             <TouchableOpacity onPress={onClose} style={styles.closeBtn}>
               <Text style={{ color: colors.textMuted, fontSize: 20 }}>✕</Text>
             </TouchableOpacity>
