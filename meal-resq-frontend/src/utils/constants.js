@@ -7,7 +7,7 @@ const getInitialBaseUrl = () => {
     if (host === 'localhost' || host === '127.0.0.1' || host.startsWith('192.168.') || host.startsWith('10.')) {
       return `http://${host}:8000`;
     }
-    return 'http://10.239.19.5:8000';
+    return 'http://10.242.53.5:8000';
   }
 
   // Extract host IP dynamically from Expo manifest
@@ -19,13 +19,14 @@ const getInitialBaseUrl = () => {
     }
   }
 
-  return 'http://10.239.19.5:8000';
+  return 'http://10.242.53.5:8000';
 };
 
 
 export const AppConstants = {
   baseUrl: getInitialBaseUrl(),
   fallbackUrls: [
+    'http://10.242.53.5:8000',
     'http://10.239.19.5:8000',
     'http://10.239.19.237:8000',
     'http://localhost:8000',
@@ -36,6 +37,7 @@ export const AppConstants = {
   appName: 'Meal_ResQ',
   tagline: 'Rescuing Food, Enriching Lives',
 };
+
 
 
 
