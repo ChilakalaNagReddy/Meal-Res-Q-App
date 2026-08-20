@@ -58,12 +58,14 @@ async function syncBackendUsers() {
     if (res.ok) {
       const data = await res.json();
       if (Array.isArray(data) && data.length > 0) {
-        const localEmails = new Set(registeredUsersList.map(u => (u.email || '').trim().toLowerCase()));
         data.forEach(remoteUser => {
           const rEmail = (remoteUser.email || '').trim().toLowerCase();
-          if (rEmail && !localEmails.has(rEmail)) {
+          if (!rEmail) return;
+          const idx = registeredUsersList.findIndex(u => (u.email || '').trim().toLowerCase() === rEmail);
+          if (idx >= 0) {
+            registeredUsersList[idx] = { ...registeredUsersList[idx], ...remoteUser };
+          } else {
             registeredUsersList.push({ ...remoteUser, password: 'password' });
-            localEmails.add(rEmail);
           }
         });
         if (Platform.OS === 'web' && typeof localStorage !== 'undefined') {
@@ -75,6 +77,7 @@ async function syncBackendUsers() {
     }
   } catch (e) {}
 }
+
 
 async function getRegisteredUsers() {
   try {
@@ -278,24 +281,12 @@ export const authService = {
       }
     }
 
-    const list = registeredUsersList;
-
-    // Check if account exists under target role vs any role
-    const registeredAccountForRole = list.find(
-      (u) => ((u.email || '').trim().toLowerCase() === cleanId || (u.username || '').trim().toLowerCase() === cleanId) &&
-             ((u.role || '').trim().toLowerCase() === cleanRole)
-    );
-    const registeredAccountAnyRole = list.find(
-      (u) => (u.email || '').trim().toLowerCase() === cleanId || (u.username || '').trim().toLowerCase() === cleanId
-    );
-
     try {
       const response = await fetchWithFallback('/api/v1/auth/login', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ login_id: loginId, password, role: cleanRole }),
       });
-
 
       const data = await response.json();
       if (response.ok) {
@@ -326,7 +317,20 @@ export const authService = {
           message: formatErrorMessage(data.detail, '⚠️ Authentication failed. Please check your credentials.'),
         };
       }
-    } catch (err) {}
+    } catch (err) {
+      console.warn('Network login fallback note:', err);
+    }
+
+    // OFFLINE FALLBACK - Load up to date registered users list
+    const list = await getRegisteredUsers();
+
+    const registeredAccountForRole = list.find(
+      (u) => ((u.email || '').trim().toLowerCase() === cleanId || (u.username || '').trim().toLowerCase() === cleanId) &&
+             ((u.role || '').trim().toLowerCase() === cleanRole)
+    );
+    const registeredAccountAnyRole = list.find(
+      (u) => (u.email || '').trim().toLowerCase() === cleanId || (u.username || '').trim().toLowerCase() === cleanId
+    );
 
     if (registeredAccountAnyRole && registeredAccountAnyRole.role !== cleanRole) {
       const roleLabels = {
@@ -354,8 +358,6 @@ export const authService = {
       return { success: true, user: memoryUser, token: memoryToken };
     }
 
-
-
     const roleLabels = {
       donor: 'Food Donor',
       ngo: 'NGO / Charity',
@@ -369,6 +371,7 @@ export const authService = {
       success: false,
       message: `⚠️ Access Denied! You have not registered for the '${roleLabel}' role yet. Please click 'Sign Up as ${roleLabel}' below to create an account for this role first.`,
     };
+
   },
 
 
