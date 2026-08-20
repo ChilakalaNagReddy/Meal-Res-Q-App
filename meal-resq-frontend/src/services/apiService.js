@@ -637,9 +637,12 @@ export const apiService = {
             status: d.status || 'available',
           }));
 
-          localDonationsStore = formattedRemote;
+          const remoteMap = new Map(formattedRemote.map(item => [String(item.id), item]));
+          const otherItems = localDonationsStore.filter(localItem => !remoteMap.has(String(localItem.id)));
+          localDonationsStore = [...formattedRemote, ...otherItems];
           saveDonationsToStorage();
           notifyDonationChange();
+
         }
       }
     } catch (e) {

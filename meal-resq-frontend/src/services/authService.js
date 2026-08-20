@@ -132,30 +132,61 @@ function formatErrorMessage(detail, fallback) {
   return String(detail);
 }
 
-// Multi-endpoint fast fallback fetch helper
+// Multi-endpoint fast parallel fallback fetch helper (<1 second response)
 export async function fetchWithFallback(endpointPath, options = {}) {
+  const primaryBase = AppConstants.baseUrl;
+
+  // Step 1: Try primary URL first with fast 1200ms timeout
+  if (primaryBase) {
+    try {
+      const controller = new AbortController();
+      const timeoutId = setTimeout(() => controller.abort(), 1200);
+      const response = await fetch(`${primaryBase}${endpointPath}`, { ...options, signal: controller.signal });
+      clearTimeout(timeoutId);
+      if (response && (response.ok || response.status < 500)) {
+        return response;
+      }
+    } catch (e) {}
+  }
+
+  // Step 2: Parallel fetch across all unique fallback URLs
   const baseUrls = [AppConstants.baseUrl, ...AppConstants.fallbackUrls];
   const uniqueUrls = [...new Set(baseUrls.filter(Boolean))];
 
-  let lastError = null;
-  for (const base of uniqueUrls) {
+  const fetchPromises = uniqueUrls.map(async (base) => {
+    const controller = new AbortController();
+    const timeoutId = setTimeout(() => controller.abort(), 1800);
     try {
-      const controller = new AbortController();
-      const timeoutId = setTimeout(() => controller.abort(), 5000);
-      const url = `${base}${endpointPath}`;
-      const response = await fetch(url, { ...options, signal: controller.signal });
+      const response = await fetch(`${base}${endpointPath}`, { ...options, signal: controller.signal });
       clearTimeout(timeoutId);
-
       if (response && (response.ok || response.status < 500)) {
-        AppConstants.baseUrl = base; // Cache working active server URL
+        AppConstants.baseUrl = base; // Cache winning fast server URL
         return response;
       }
+      throw new Error(`Server ${base} returned status ${response?.status}`);
     } catch (err) {
-      lastError = err;
+      clearTimeout(timeoutId);
+      throw err;
     }
+  });
+
+  if (typeof Promise.any === 'function') {
+    try {
+      return await Promise.any(fetchPromises);
+    } catch (e) {}
   }
-  throw lastError || new Error('Network request failed across host URLs.');
+
+  // Fallback sequential if Promise.any unavailable
+  for (const p of fetchPromises) {
+    try {
+      const res = await p;
+      if (res) return res;
+    } catch (e) {}
+  }
+
+  throw new Error('Network request failed across all host URLs.');
 }
+
 
 
 

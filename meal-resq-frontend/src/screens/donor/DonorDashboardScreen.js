@@ -38,7 +38,8 @@ export function DonorDashboardScreen({ navigation, user, onLogout }) {
     });
     const interval = setInterval(() => {
       fetchDonations();
-    }, 3000);
+    }, 1500);
+
     const unsubscribe = navigation?.addListener ? navigation.addListener('focus', () => {
       fetchDonations();
     }) : null;
