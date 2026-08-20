@@ -12,7 +12,8 @@ router = APIRouter(prefix="/api/v1/ngo", tags=["ngo"])
 @router.get("/available", response_model=List[DonationOut])
 @router.get("/available-donations", response_model=List[DonationOut])
 def get_available_donations(db: Any = Depends(get_db)):
-    donations = db.query(Donation).order_by(Donation.created_at.desc()).all()
+    donations = db.query(Donation).filter(Donation.status == 'available').order_by(Donation.created_at.desc()).all()
+
     result = []
     for d in donations:
         item = DonationOut.from_orm(d)

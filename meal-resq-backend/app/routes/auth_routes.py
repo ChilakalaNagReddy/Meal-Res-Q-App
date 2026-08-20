@@ -374,7 +374,9 @@ def reset_password(payload: ResetPassword, db: Any = Depends(get_db)):
     return {"success": True, "message": "Password reset successfully! You can now log in with your new password."}
 
 @router.post("/register", response_model=UserOut)
+@router.post("/signup", response_model=UserOut)
 def register(user_data: UserCreate, db: Any = Depends(get_db)):
+
     email = user_data.email.strip().lower()
     if not validate_email(email):
         raise HTTPException(
