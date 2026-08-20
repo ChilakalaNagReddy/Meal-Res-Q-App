@@ -32,7 +32,8 @@ export function NgoDashboardScreen({ navigation, user, onLogout }) {
     });
     const interval = setInterval(() => {
       fetchData();
-    }, 3000);
+    }, 1500);
+
     const unsubscribe = navigation?.addListener ? navigation.addListener('focus', () => {
       fetchData();
     }) : null;

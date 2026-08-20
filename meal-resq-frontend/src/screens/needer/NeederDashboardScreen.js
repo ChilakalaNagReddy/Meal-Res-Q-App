@@ -32,7 +32,8 @@ export function NeederDashboardScreen({ navigation, user, onLogout }) {
     });
     const interval = setInterval(() => {
       fetchFood();
-    }, 3000);
+    }, 1500);
+
     const unsubscribe = navigation?.addListener ? navigation.addListener('focus', () => {
       fetchFood();
     }) : null;

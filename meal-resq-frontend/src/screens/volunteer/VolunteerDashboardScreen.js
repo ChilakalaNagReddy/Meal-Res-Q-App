@@ -33,7 +33,8 @@ export function VolunteerDashboardScreen({ navigation, user, onLogout }) {
     });
     const interval = setInterval(() => {
       fetchPickups();
-    }, 3000);
+    }, 1500);
+
     const unsubscribe = navigation?.addListener ? navigation.addListener('focus', () => {
       fetchPickups();
     }) : null;
