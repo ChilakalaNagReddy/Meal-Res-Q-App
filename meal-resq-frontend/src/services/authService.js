@@ -136,11 +136,11 @@ function formatErrorMessage(detail, fallback) {
 export async function fetchWithFallback(endpointPath, options = {}) {
   const primaryBase = AppConstants.baseUrl;
 
-  // Step 1: Try primary URL first with fast 1200ms timeout
+  // Step 1: Try primary URL first with 2500ms timeout
   if (primaryBase) {
     try {
       const controller = new AbortController();
-      const timeoutId = setTimeout(() => controller.abort(), 1200);
+      const timeoutId = setTimeout(() => controller.abort(), 2500);
       const response = await fetch(`${primaryBase}${endpointPath}`, { ...options, signal: controller.signal });
       clearTimeout(timeoutId);
       if (response && (response.ok || response.status < 500)) {
@@ -155,7 +155,7 @@ export async function fetchWithFallback(endpointPath, options = {}) {
 
   const fetchPromises = uniqueUrls.map(async (base) => {
     const controller = new AbortController();
-    const timeoutId = setTimeout(() => controller.abort(), 1800);
+    const timeoutId = setTimeout(() => controller.abort(), 3500);
     try {
       const response = await fetch(`${base}${endpointPath}`, { ...options, signal: controller.signal });
       clearTimeout(timeoutId);
@@ -481,21 +481,9 @@ export const authService = {
     if (existingAccount) {
       return {
         success: false,
-        message: '⚠️ This email address is already registered! Please click "Sign In to Account" below to log in.',
+        message: '⚠️ This email address is already registered! An email can only sign up once. Please click "Sign In to Account" below to log in.',
       };
     }
-
-    const newAccount = {
-      name,
-      username,
-      email: cleanEmail,
-      password,
-      role,
-      phone,
-      address,
-    };
-
-    await saveRegisteredUser(newAccount);
 
     try {
       const response = await fetchWithFallback('/api/v1/auth/register', {
@@ -514,9 +502,39 @@ export const authService = {
 
       const data = await response.json();
       if (response.ok) {
+        const newAccount = {
+          id: data.id,
+          name: data.name,
+          username: data.username,
+          email: cleanEmail,
+          password,
+          role: data.role,
+          phone: data.phone,
+          address: data.address,
+        };
+        await saveRegisteredUser(newAccount);
         return { success: true, user: data };
+      } else {
+        return {
+          success: false,
+          message: formatErrorMessage(data.detail, '⚠️ Registration failed. This email address is already registered.'),
+        };
       }
-    } catch (err) {}
+    } catch (err) {
+      console.warn('Network register fallback note:', err);
+    }
+
+    // Local save ONLY as offline fallback if server unreachable
+    const newAccount = {
+      name,
+      username,
+      email: cleanEmail,
+      password,
+      role,
+      phone,
+      address,
+    };
+    await saveRegisteredUser(newAccount);
 
     return {
       success: true,

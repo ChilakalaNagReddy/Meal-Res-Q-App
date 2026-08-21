@@ -99,6 +99,7 @@ class DonationOut(BaseModel):
     created_at: datetime
     donor_name: Optional[str] = None
     donor_phone: Optional[str] = None
+    donor_email: Optional[str] = None
     claimed_by_name: Optional[str] = None
     claimed_by_phone: Optional[str] = None
     claimed_by_role: Optional[str] = None

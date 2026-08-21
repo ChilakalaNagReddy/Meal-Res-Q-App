@@ -43,9 +43,10 @@ def create_donation(
         db.add(notif)
     db.commit()
 
-    donation_dict = DonationOut.from_orm(donation)
+    donation_dict = DonationOut.model_validate(donation)
     donation_dict.donor_name = current_user.name
     donation_dict.donor_phone = current_user.phone
+    donation_dict.donor_email = current_user.email
     return donation_dict
 
 @router.get("/donations", response_model=List[DonationOut])
@@ -56,13 +57,15 @@ def get_donor_donations(
     donations = db.query(Donation).filter(Donation.donor_id == current_user.id).order_by(Donation.created_at.desc()).all()
     result = []
     for d in donations:
-        item = DonationOut.from_orm(d)
+        item = DonationOut.model_validate(d)
         if d.donor:
             item.donor_name = d.donor.name
             item.donor_phone = d.donor.phone
+            item.donor_email = d.donor.email
         else:
             item.donor_name = current_user.name
             item.donor_phone = current_user.phone
+            item.donor_email = current_user.email
 
         if d.pickups and len(d.pickups) > 0:
             p = d.pickups[-1]

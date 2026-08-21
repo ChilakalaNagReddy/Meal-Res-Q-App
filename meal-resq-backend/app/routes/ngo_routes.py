@@ -16,10 +16,11 @@ def get_available_donations(db: Any = Depends(get_db)):
 
     result = []
     for d in donations:
-        item = DonationOut.from_orm(d)
+        item = DonationOut.model_validate(d)
         if d.donor:
             item.donor_name = d.donor.name
             item.donor_phone = d.donor.phone
+            item.donor_email = d.donor.email
         if d.pickups and len(d.pickups) > 0:
             p = d.pickups[-1]
             if p.ngo and p.ngo.user:
@@ -44,10 +45,11 @@ def get_all_donations(db: Any = Depends(get_db)):
     donations = db.query(Donation).order_by(Donation.created_at.desc()).all()
     result = []
     for d in donations:
-        item = DonationOut.from_orm(d)
+        item = DonationOut.model_validate(d)
         if d.donor:
             item.donor_name = d.donor.name
             item.donor_phone = d.donor.phone
+            item.donor_email = d.donor.email
         if d.pickups and len(d.pickups) > 0:
             p = d.pickups[-1]
             if p.ngo and p.ngo.user:

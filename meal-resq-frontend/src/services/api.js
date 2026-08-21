@@ -1,4 +1,7 @@
-const API_BASE = 'http://localhost:5000/api';
+import { AppConstants } from '../utils/constants';
+
+const getApiBase = () => `${AppConstants.baseUrl}/api/v1`;
+const API_BASE = AppConstants.baseUrl;
 
 export const api = {
   // Fetch surplus meals

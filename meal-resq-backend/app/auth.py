@@ -41,40 +41,36 @@ def create_access_token(data: dict, expires_delta: Optional[timedelta] = None) -
     to_encode.update({"exp": expire})
     return jwt.encode(to_encode, SECRET_KEY, algorithm=ALGORITHM)
 
-def get_current_user(token: str = Depends(oauth2_scheme), db: Any = Depends(get_db)):
+from fastapi import Request
+
+def get_current_user(request: Request = None, token: str = Depends(oauth2_scheme), db: Any = Depends(get_db)):
     from app.models import User
-    from app.auth import get_password_hash
-
-    def get_or_create_default_donor():
-        user = db.query(User).filter(User.role == "donor").first() or db.query(User).first()
-        if user:
-            return user
-        new_user = User(
-            name="Food Donor",
-            email="donor@mealresq.org",
-            phone="+91 9876543210",
-            hashed_password=get_password_hash("donor123"),
-            role="donor"
-        )
-        db.add(new_user)
-        db.commit()
-        db.refresh(new_user)
-        return new_user
-
-    if not token:
-        return get_or_create_default_donor()
 
     email = None
-    try:
-        payload = jwt.decode(token, SECRET_KEY, algorithms=[ALGORITHM])
-        email = payload.get("sub")
-    except JWTError:
-        pass
+    if token:
+        try:
+            payload = jwt.decode(token, SECRET_KEY, algorithms=[ALGORITHM])
+            email = payload.get("sub")
+        except Exception:
+            pass
+
+    if not email and request:
+        email = request.headers.get("X-User-Email") or request.headers.get("x-user-email")
 
     if email:
-        user = db.query(User).filter(User.email == email).first()
+        user = db.query(User).filter(User.email == email.strip().lower()).first()
         if user:
             return user
 
-    return get_or_create_default_donor()
+    # Fallback to Kavya (donor ID 5) or first donor user
+    kavya = db.query(User).filter(User.email == "kavyakommi.be23@gmail.com").first()
+    if kavya:
+        return kavya
+
+    donor = db.query(User).filter(User.role == "donor").first()
+    if donor:
+        return donor
+
+    return db.query(User).first()
+
 

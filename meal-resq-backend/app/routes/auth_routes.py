@@ -399,27 +399,14 @@ def register(user_data: UserCreate, db: Any = Depends(get_db)):
 
     target_role = user_data.role.strip().lower()
     
-    # Handle existing email gracefully to prevent UNIQUE constraint failure on users.email
+    # Strictly enforce one signup per email
     existing_user = db.query(User).filter(User.email == email).first()
     if existing_user:
-        existing_user.name = user_data.name or existing_user.name
-        existing_user.role = target_role
-        existing_user.password_hash = get_password_hash(user_data.password)
-        if phone:
-            existing_user.phone = phone
-        if user_data.address:
-            existing_user.address = user_data.address
-
-        if target_role == "ngo" and not db.query(NGO).filter(NGO.user_id == existing_user.id).first():
-            ngo = NGO(user_id=existing_user.id, ngo_name=existing_user.name, contact_email=existing_user.email, verified=True)
-            db.add(ngo)
-        elif target_role == "volunteer" and not db.query(Volunteer).filter(Volunteer.user_id == existing_user.id).first():
-            volunteer = Volunteer(user_id=existing_user.id, name=existing_user.name, is_available=True)
-            db.add(volunteer)
-
-        db.commit()
-        db.refresh(existing_user)
-        return existing_user
+        role_label = existing_user.role.title()
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=f"⚠️ This email address ({email}) is already registered! An email can only sign up once. Please select the '{role_label}' role card and log in to your account."
+        )
     
     # Generate unique username per user
     username = user_data.username or email.split("@")[0]

@@ -6,11 +6,14 @@ import { authService, fetchWithFallback } from './authService';
 
 async function authHeaders() {
   const token = await authService.getToken();
+  const currentUser = await authService.getCurrentUser();
   return {
     'Content-Type': 'application/json',
     ...(token ? { Authorization: `Bearer ${token}` } : {}),
+    ...(currentUser?.email ? { 'X-User-Email': currentUser.email } : {}),
   };
 }
+
 
 export function parseBackendDate(dateStr) {
   if (!dateStr) return new Date();
@@ -534,13 +537,15 @@ export const apiService = {
       food_name: foodTitle,
       quantity: foodQty,
       category: foodCat,
-      expiry_time: donationData.expiry_time || '4 Hours',
+      expiry_time: donationData.expiry_time || 'Within 4 Hours',
       pickup_address: foodLoc,
       description: donationData.description || '',
       image_url: donationData.image_url || donationData.food_image,
       food_image: donationData.image_url || donationData.food_image,
+      donor_id: donationData.donor_id || '',
       donor_name: donationData.donor_name || 'Food Donor',
       donor_phone: donationData.donor_phone || '+91 9876543210',
+      donor_email: donationData.donor_email || '',
       status: 'available',
     };
 
@@ -559,7 +564,6 @@ export const apiService = {
       },
       ...localNotificationsStore,
     ];
-
 
     saveDonationsToStorage();
     notifyDonationChange();
@@ -589,6 +593,10 @@ export const apiService = {
                 return {
                   ...d,
                   id: saved.id,
+                  donor_id: saved.donor_id || d.donor_id,
+                  donor_name: saved.donor_name || d.donor_name,
+                  donor_phone: saved.donor_phone || d.donor_phone,
+                  donor_email: saved.donor_email || d.donor_email,
                   is_optimistic: false,
                   created_at: saved.created_at ? `🕒 Posted at ${new Date(saved.created_at).toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'})}` : d.created_at,
                 };
@@ -615,48 +623,8 @@ export const apiService = {
   },
 
   async createDonation(donationData) {
-    const newItem = this.addOptimisticDonation(donationData);
-    try {
-      const headers = await authHeaders();
-      const payload = {
-        food_name: donationData.food_name || donationData.food_title || donationData.title || 'Surplus Food',
-        quantity: donationData.quantity || '5 kg',
-        category: donationData.category || 'Vegetarian',
-        expiry_time: donationData.expiry_time || 'Within 4 Hours',
-        pickup_address: donationData.pickup_address || donationData.location || donationData.address || 'Local Community Center',
-        description: donationData.description || '',
-        food_image: donationData.image_url || donationData.food_image || null,
-      };
-      const res = await fetchWithFallback('/api/v1/donor/donations', {
-        method: 'POST',
-        headers,
-        body: JSON.stringify(payload),
-      });
-      if (res && res.ok) {
-        const saved = await res.json();
-        if (saved && saved.id) {
-          newItem.id = saved.id;
-          await this.syncAllDonationsFromBackend();
-          saveDonationsToStorage();
-          notifyDonationChange();
-          return newItem;
-        }
-      }
-      // Purge temporary item if backend save failed
-      localDonationsStore = localDonationsStore.filter(d => String(d.id) !== String(newItem.id));
-      saveDonationsToStorage();
-      notifyDonationChange();
-    } catch (e) {
-      console.warn('Sync createDonation error:', e);
-      localDonationsStore = localDonationsStore.filter(d => String(d.id) !== String(newItem.id));
-      saveDonationsToStorage();
-      notifyDonationChange();
-    }
-    return newItem;
+    return this.addOptimisticDonation(donationData);
   },
-
-
-
 
   getLocalDonationsSync(currentUser) {
     loadDonationsFromStorage();
@@ -670,10 +638,10 @@ export const apiService = {
         const uPhone = (currentUser.phone || '').trim();
 
         const isIdMatch = uId && String(d.donor_id) === uId;
-        const isNameMatch = uName && d.donor_name && d.donor_name.trim().toLowerCase() === uName;
+        const isNameMatch = uName && d.donor_name && (d.donor_name.trim().toLowerCase().includes(uName) || uName.includes(d.donor_name.trim().toLowerCase()));
         const isEmailMatch = uEmail && d.donor_email && d.donor_email.trim().toLowerCase() === uEmail;
         const isPhoneMatch = uPhone && d.donor_phone && d.donor_phone.trim() === uPhone;
-        return isIdMatch || isNameMatch || isEmailMatch || isPhoneMatch;
+        return isIdMatch || isNameMatch || isEmailMatch || isPhoneMatch || d.is_optimistic || !uId;
       }
       return true;
     });
@@ -745,10 +713,10 @@ export const apiService = {
       return localDonationsStore.filter(d => {
         if (!d || deletedDonationIdsSet.has(String(d.id))) return false;
         const isIdMatch = uId && String(d.donor_id) === uId;
-        const isNameMatch = uName && d.donor_name && d.donor_name.trim().toLowerCase() === uName;
+        const isNameMatch = uName && d.donor_name && (d.donor_name.trim().toLowerCase().includes(uName) || uName.includes(d.donor_name.trim().toLowerCase()));
         const isEmailMatch = uEmail && d.donor_email && d.donor_email.trim().toLowerCase() === uEmail;
         const isPhoneMatch = uPhone && d.donor_phone && d.donor_phone.trim() === uPhone;
-        return isIdMatch || isNameMatch || isEmailMatch || isPhoneMatch;
+        return isIdMatch || isNameMatch || isEmailMatch || isPhoneMatch || d.is_optimistic || !uId;
       });
     }
     return localDonationsStore.filter(d => !deletedDonationIdsSet.has(String(d.id)));
@@ -807,6 +775,7 @@ export const apiService = {
               food_image: d.food_image,
               donor_name: d.donor_name || 'Food Donor',
               donor_phone: d.donor_phone || '',
+              donor_email: d.donor_email || '',
               claimed_by_id: d.claimed_by_id || null,
               claimed_by_name: d.claimed_by_name || null,
               claimed_by_phone: d.claimed_by_phone || null,
@@ -862,6 +831,7 @@ export const apiService = {
               food_image: d.food_image,
               donor_name: d.donor_name || 'Food Donor',
               donor_phone: d.donor_phone || '',
+              donor_email: d.donor_email || '',
               claimed_by_id: d.claimed_by_id || null,
               claimed_by_name: d.claimed_by_name || null,
               claimed_by_phone: d.claimed_by_phone || null,
@@ -869,7 +839,6 @@ export const apiService = {
               status: d.status || 'available',
             };
           });
-
 
           const combined = [...pendingTempItems, ...formattedRemote];
           const seen = new Set();
