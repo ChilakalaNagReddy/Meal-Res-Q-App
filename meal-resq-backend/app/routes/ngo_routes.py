@@ -7,11 +7,14 @@ from app.models import User, NGO, Donation, Pickup, Notification, Volunteer
 from app.schemas import DonationOut, PickupOut
 from app.auth import get_current_user
 
+from app.utils import cleanup_expired_donations
+
 router = APIRouter(prefix="/api/v1/ngo", tags=["ngo"])
 
 @router.get("/available", response_model=List[DonationOut])
 @router.get("/available-donations", response_model=List[DonationOut])
 def get_available_donations(db: Any = Depends(get_db)):
+    cleanup_expired_donations(db)
     donations = db.query(Donation).filter(Donation.status == 'available').order_by(Donation.created_at.desc()).all()
 
     result = []
@@ -42,6 +45,7 @@ def get_available_donations(db: Any = Depends(get_db)):
 
 @router.get("/all-donations", response_model=List[DonationOut])
 def get_all_donations(db: Any = Depends(get_db)):
+    cleanup_expired_donations(db)
     donations = db.query(Donation).order_by(Donation.created_at.desc()).all()
     result = []
     for d in donations:
@@ -78,9 +82,6 @@ def accept_donation(
     db: Any = Depends(get_db),
     current_user: User = Depends(get_current_user)
 ):
-    if current_user.role not in ["ngo", "volunteer"]:
-        raise HTTPException(status_code=403, detail="Only NGOs or Volunteers can claim food donations.")
-
     donation = db.query(Donation).filter(Donation.id == donation_id).first()
     if not donation or donation.status != "available":
         raise HTTPException(status_code=400, detail="Donation is no longer available.")
@@ -89,11 +90,13 @@ def accept_donation(
     
     ngo_profile = db.query(NGO).filter(NGO.user_id == current_user.id).first() if current_user.role == "ngo" else None
     volunteer_profile = db.query(Volunteer).filter(Volunteer.user_id == current_user.id).first() if current_user.role == "volunteer" else None
+    needer_id = current_user.id if (current_user.role == "needer" or (not ngo_profile and not volunteer_profile)) else None
 
     pickup = Pickup(
         donation_id=donation.id,
         ngo_id=ngo_profile.id if ngo_profile else None,
         volunteer_id=volunteer_profile.id if volunteer_profile else None,
+        needer_id=needer_id,
         status="claimed"
     )
     db.add(pickup)
@@ -101,15 +104,17 @@ def accept_donation(
     db.refresh(pickup)
 
     # Notify Donor
+    role_label = current_user.role.upper() if current_user.role else "USER"
     notif = Notification(
         user_id=donation.donor_id,
         title="🎉 Food Claimed!",
-        message=f"{current_user.name} claimed your donation '{donation.food_name}'."
+        message=f"{current_user.name} ({role_label}) claimed your donation '{donation.food_name}'."
     )
     db.add(notif)
     db.commit()
 
     return pickup
+
 
 @router.get("/claimed", response_model=List[PickupOut])
 def get_claimed_pickups(

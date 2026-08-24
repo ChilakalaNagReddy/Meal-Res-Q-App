@@ -83,15 +83,6 @@ function RoleTabNavigator({ currentUser, onLogout, onUpdateUser }) {
         {(props) => getRoleDashboard(props)}
       </Tab.Screen>
 
-      <Tab.Screen
-        name="Notifications"
-        options={{
-          tabBarLabel: t('alerts'),
-          tabBarIcon: ({ color }) => <Text style={{ fontSize: 18, color }}>🔔</Text>,
-        }}
-      >
-        {(props) => <NotificationsScreen {...props} user={currentUser} />}
-      </Tab.Screen>
 
       <Tab.Screen
         name="Chat"

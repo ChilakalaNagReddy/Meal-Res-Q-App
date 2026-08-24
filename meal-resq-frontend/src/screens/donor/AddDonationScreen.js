@@ -11,14 +11,16 @@ export function AddDonationScreen({ navigation, user, route }) {
   const { t } = useLanguage();
 
   const currentUser = user || route?.params?.user || {};
+  const editItem = route?.params?.editDonation || route?.params?.donation || null;
+  const isEdit = !!editItem;
 
-  const [foodName, setFoodName] = useState('');
-  const [quantity, setQuantity] = useState('');
-  const [category, setCategory] = useState('Vegetarian');
-  const [expiryTime, setExpiryTime] = useState('Within 4 Hours');
-  const [pickupAddress, setPickupAddress] = useState(currentUser.address || 'Pop city, Main Road');
-  const [description, setDescription] = useState('');
-  const [foodImage, setFoodImage] = useState(null);
+  const [foodName, setFoodName] = useState(editItem?.food_name || '');
+  const [quantity, setQuantity] = useState(editItem?.quantity || '');
+  const [category, setCategory] = useState(editItem?.category || 'Vegetarian');
+  const [expiryTime, setExpiryTime] = useState(editItem?.expiry_time || 'Within 4 Hours');
+  const [pickupAddress, setPickupAddress] = useState(editItem?.pickup_address || currentUser.address || 'Pop city, Main Road');
+  const [description, setDescription] = useState(editItem?.description || '');
+  const [foodImage, setFoodImage] = useState(editItem?.food_image || editItem?.image_url || null);
 
   const [loading, setLoading] = useState(false);
   const [errorMsg, setErrorMsg] = useState('');
@@ -35,12 +37,19 @@ export function AddDonationScreen({ navigation, user, route }) {
     { label: '🍲 Cooked Meals', value: 'Cooked Meals' },
   ];
 
-  // Auto-prefill Pickup Address with user's registered location address
   useEffect(() => {
-    if (currentUser?.address) {
+    if (editItem) {
+      setFoodName(editItem.food_name || '');
+      setQuantity(editItem.quantity || '');
+      setCategory(editItem.category || 'Vegetarian');
+      setExpiryTime(editItem.expiry_time || 'Within 4 Hours');
+      setPickupAddress(editItem.pickup_address || currentUser.address || 'Pop city, Main Road');
+      setDescription(editItem.description || '');
+      setFoodImage(editItem.food_image || editItem.image_url || null);
+    } else if (currentUser?.address) {
       setPickupAddress(currentUser.address);
     }
-  }, [user, route]);
+  }, [editItem, currentUser?.address]);
 
 
   // Clean up camera stream on unmount
@@ -190,7 +199,7 @@ export function AddDonationScreen({ navigation, user, route }) {
 
     setLoading(true);
     try {
-      await apiService.createDonation({
+      const payload = {
         food_name: cleanFoodName,
         quantity: cleanQty,
         category: category || 'Vegetarian',
@@ -202,9 +211,15 @@ export function AddDonationScreen({ navigation, user, route }) {
         donor_name: donorName,
         donor_phone: donorPhone,
         donor_email: currentUser.email || user?.email || '',
-      });
+      };
+
+      if (isEdit && editItem?.id) {
+        await apiService.updateDonation(editItem.id, payload);
+      } else {
+        await apiService.createDonation(payload);
+      }
     } catch (e) {
-      console.warn('Post donation error:', e);
+      console.warn('Save donation error:', e);
     } finally {
       setLoading(false);
     }
@@ -228,7 +243,7 @@ export function AddDonationScreen({ navigation, user, route }) {
           </TouchableOpacity>
         </View>
 
-        <Text style={[styles.title, { color: colors.textPrimary }]}>🍲 {t('postFood')}</Text>
+        <Text style={[styles.title, { color: colors.textPrimary }]}>{isEdit ? '✏️ Edit Food Donation' : `🍲 ${t('postFood')}`}</Text>
         <Text style={[styles.subtitle, { color: colors.textSecondary }]}>Share fresh extra meals with nearby NGOs & shelters</Text>
 
         {errorMsg ? (
@@ -338,7 +353,7 @@ export function AddDonationScreen({ navigation, user, route }) {
         </View>
 
         <TouchableOpacity style={[styles.submitBtn, { backgroundColor: colors.accentDonor }]} onPress={handleSubmit} disabled={loading}>
-          {loading ? <ActivityIndicator color="#FFF" /> : <Text style={styles.submitBtnText}>Post Food Donation</Text>}
+          {loading ? <ActivityIndicator color="#FFF" /> : <Text style={styles.submitBtnText}>{isEdit ? '💾 Save Updated Donation' : 'Post Food Donation'}</Text>}
         </TouchableOpacity>
       </ScrollView>
 

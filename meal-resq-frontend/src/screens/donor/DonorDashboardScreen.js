@@ -216,9 +216,15 @@ export function DonorDashboardScreen({ navigation, user, onLogout }) {
                 )}
 
 
-                <TouchableOpacity style={styles.delBtn} onPress={() => handleDelete(item.id)}>
-                  <Text style={{ color: colors.error, fontSize: 12, fontWeight: '700' }}>🗑️ Delete Listing</Text>
-                </TouchableOpacity>
+                <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginTop: 10 }}>
+                  <TouchableOpacity style={styles.editBtn} onPress={() => navigation.navigate('AddDonation', { user, editDonation: item })}>
+                    <Text style={{ color: '#3b82f6', fontSize: 12, fontWeight: '700' }}>✏️ Edit Listing</Text>
+                  </TouchableOpacity>
+
+                  <TouchableOpacity style={styles.delBtn} onPress={() => handleDelete(item.id)}>
+                    <Text style={{ color: colors.error, fontSize: 12, fontWeight: '700' }}>🗑️ Delete Listing</Text>
+                  </TouchableOpacity>
+                </View>
               </View>
             ))
 

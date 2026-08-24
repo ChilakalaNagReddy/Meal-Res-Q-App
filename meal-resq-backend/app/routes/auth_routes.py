@@ -589,3 +589,17 @@ def update_profile(
 @router.get("/me", response_model=UserOut)
 def get_me(current_user: User = Depends(get_current_user)):
     return current_user
+
+@router.post("/wipe-all")
+def wipe_all_database(db: Any = Depends(get_db)):
+    from app.models import User, NGO, Volunteer, Donation, Pickup, FoodRequest, Notification, ChatMessage
+    db.query(ChatMessage).delete()
+    db.query(Notification).delete()
+    db.query(FoodRequest).delete()
+    db.query(Pickup).delete()
+    db.query(Donation).delete()
+    db.query(NGO).delete()
+    db.query(Volunteer).delete()
+    db.query(User).delete()
+    db.commit()
+    return {"success": True, "message": "All database records completely wiped clean."}

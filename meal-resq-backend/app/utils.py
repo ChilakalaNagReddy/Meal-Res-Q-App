@@ -31,3 +31,21 @@ def calculate_distance_km(lat1, lon1, lat2, lon2):
          math.sin(dlon / 2) ** 2)
     c = 2 * math.atan2(math.sqrt(a), math.sqrt(1 - a))
     return round(R * c, 2)
+
+from datetime import datetime, timedelta
+from sqlalchemy.orm import Session
+
+def cleanup_expired_donations(db: Session):
+    try:
+        from app.models import Donation, Pickup, FoodRequest
+        cutoff = datetime.now() - timedelta(hours=24)
+        expired_donations = db.query(Donation).filter(Donation.created_at < cutoff).all()
+        if expired_donations:
+            expired_ids = [d.id for d in expired_donations]
+            db.query(Pickup).filter(Pickup.donation_id.in_(expired_ids)).delete(synchronize_session=False)
+            db.query(FoodRequest).filter(FoodRequest.donation_id.in_(expired_ids)).delete(synchronize_session=False)
+            db.query(Donation).filter(Donation.id.in_(expired_ids)).delete(synchronize_session=False)
+            db.commit()
+    except Exception as e:
+        db.rollback()
+        print(f"Cleanup expired donations note: {e}")

@@ -84,6 +84,16 @@ class DonationCreate(BaseModel):
     pickup_address: str
     description: Optional[str] = None
     food_image: Optional[str] = None
+    donor_email: Optional[str] = None
+
+class DonationUpdate(BaseModel):
+    food_name: Optional[str] = None
+    quantity: Optional[str] = None
+    category: Optional[str] = None
+    expiry_time: Optional[str] = None
+    pickup_address: Optional[str] = None
+    description: Optional[str] = None
+    food_image: Optional[str] = None
 
 class DonationOut(BaseModel):
     id: int

@@ -60,7 +60,7 @@ class Donation(Base):
     description = Column(Text, nullable=True)
     food_image = Column(Text, nullable=True)
     status = Column(String(30), nullable=False, default="available")  # available, claimed, en_route, completed, cancelled
-    created_at = Column(DateTime, default=datetime.utcnow)
+    created_at = Column(DateTime, default=datetime.now)
 
     donor = relationship("User", back_populates="donations")
     pickups = relationship("Pickup", back_populates="donation")

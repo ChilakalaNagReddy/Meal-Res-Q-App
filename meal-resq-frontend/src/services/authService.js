@@ -57,17 +57,18 @@ async function syncBackendUsers() {
     const res = await fetchWithFallback('/api/v1/auth/sync-users');
     if (res.ok) {
       const data = await res.json();
-      if (Array.isArray(data) && data.length > 0) {
-        data.forEach(remoteUser => {
-          const rEmail = (remoteUser.email || '').trim().toLowerCase();
-          if (!rEmail) return;
-          const idx = registeredUsersList.findIndex(u => (u.email || '').trim().toLowerCase() === rEmail);
-          if (idx >= 0) {
-            registeredUsersList[idx] = { ...registeredUsersList[idx], ...remoteUser };
-          } else {
-            registeredUsersList.push({ ...remoteUser, password: 'password' });
-          }
-        });
+      if (Array.isArray(data)) {
+        if (data.length === 0) {
+          registeredUsersList = [];
+        } else {
+          const freshList = [];
+          data.forEach(remoteUser => {
+            const rEmail = (remoteUser.email || '').trim().toLowerCase();
+            if (!rEmail) return;
+            freshList.push({ ...remoteUser, password: 'password' });
+          });
+          registeredUsersList = freshList;
+        }
         if (Platform.OS === 'web' && typeof localStorage !== 'undefined') {
           localStorage.setItem('registered_users_db', JSON.stringify(registeredUsersList));
         } else if (AsyncStorage) {
@@ -88,11 +89,16 @@ async function getRegisteredUsers() {
       raw = await AsyncStorage.getItem('registered_users_db');
     }
     if (raw) {
-      registeredUsersList = JSON.parse(raw);
+      const parsed = JSON.parse(raw);
+      if (Array.isArray(parsed)) {
+        registeredUsersList = parsed;
+      }
+    } else {
+      registeredUsersList = [];
     }
   } catch (e) {}
 
-  syncBackendUsers().catch(() => {});
+  await syncBackendUsers();
   return registeredUsersList;
 }
 
@@ -220,21 +226,36 @@ export const authService = {
   },
 
   async getCurrentUser() {
-
-    if (memoryUser) return memoryUser;
-    try {
-      let raw = null;
-      if (Platform.OS === 'web' && typeof localStorage !== 'undefined') {
-        raw = localStorage.getItem('user_data');
-      } else if (AsyncStorage) {
-        raw = await AsyncStorage.getItem('user_data');
+    if (!memoryUser) {
+      try {
+        let raw = null;
+        if (Platform.OS === 'web' && typeof localStorage !== 'undefined') {
+          raw = localStorage.getItem('user_data');
+        } else if (AsyncStorage) {
+          raw = await AsyncStorage.getItem('user_data');
+        }
+        if (raw) {
+          memoryUser = JSON.parse(raw);
+        }
+      } catch (e) {
+        console.warn('Storage read user error:', e);
       }
-      if (raw) {
-        memoryUser = JSON.parse(raw);
-      }
-    } catch (e) {
-      console.warn('Storage read user error:', e);
     }
+
+    if (memoryUser && memoryUser.email) {
+      fetchWithFallback('/api/v1/auth/me', {
+        headers: { 'X-User-Email': (memoryUser.email || '').trim().toLowerCase() }
+      }).then(async (res) => {
+        if (res && res.ok) {
+          const remoteUser = await res.json();
+          if (remoteUser && remoteUser.email) {
+            memoryUser = { ...memoryUser, ...remoteUser };
+            this.updateStoredUser(memoryUser);
+          }
+        }
+      }).catch(() => {});
+    }
+
     return memoryUser;
   },
 
@@ -253,8 +274,26 @@ export const authService = {
     } catch (e) {
       console.warn('Storage update user error:', e);
     }
+
+    try {
+      fetchWithFallback('/api/v1/auth/profile', {
+        method: 'PUT',
+        headers: {
+          'Content-Type': 'application/json',
+          ...(memoryToken ? { Authorization: `Bearer ${memoryToken}` } : {}),
+          ...(memoryUser?.email ? { 'X-User-Email': memoryUser.email } : {}),
+        },
+        body: JSON.stringify({
+          name: memoryUser.name,
+          phone: memoryUser.phone,
+          address: memoryUser.address,
+        }),
+      }).catch(() => {});
+    } catch (e) {}
+
     return memoryUser;
   },
+
 
   async isEmailRegistered(email, role) {
     const cleanEmail = (email || '').trim().toLowerCase();
@@ -400,7 +439,7 @@ export const authService = {
 
     return {
       success: false,
-      message: `⚠️ Access Denied! You have not registered for the '${roleLabel}' role yet. Please click 'Sign Up as ${roleLabel}' below to create an account for this role first.`,
+      message: `⚠️ Connection Error or Account Not Found: Unable to verify account for '${roleLabel}' (${cleanId}). Please check your internet connection and verify credentials.`,
     };
 
   },

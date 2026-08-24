@@ -4,43 +4,52 @@ import { AppConstants } from '../utils/constants';
 import { authService, fetchWithFallback } from './authService';
 
 
-async function authHeaders() {
+async function authHeaders(overrideEmail = null) {
   const token = await authService.getToken();
   const currentUser = await authService.getCurrentUser();
+  let email = currentUser?.email || overrideEmail || '';
+  if (!email && authService && typeof authService.getStoredUserSync === 'function') {
+    const syncUser = authService.getStoredUserSync();
+    if (syncUser?.email) email = syncUser.email;
+  }
+  const cleanEmail = (email || '').trim().toLowerCase();
   return {
     'Content-Type': 'application/json',
     ...(token ? { Authorization: `Bearer ${token}` } : {}),
-    ...(currentUser?.email ? { 'X-User-Email': currentUser.email } : {}),
+    ...(cleanEmail ? { 'X-User-Email': cleanEmail } : {}),
   };
 }
 
 
 export function parseBackendDate(dateStr) {
   if (!dateStr) return new Date();
+  if (dateStr instanceof Date) return dateStr;
   if (typeof dateStr === 'number') return new Date(dateStr);
 
   let s = String(dateStr).trim();
-  s = s.replace(/^🕒\s*/, '').replace(/^Posted at\s*/i, '').replace(/^Posted Today at\s*/i, '').trim();
+  s = s.replace(/^🕒\s*/, '').replace(/^Posted at\s*/i, '').replace(/^Posted Today at\s*/i, '').replace(/^Posted Yesterday at\s*/i, '').trim();
 
-  if (s.toLowerCase().startsWith('today')) {
-    return new Date();
-  }
-  if (s.toLowerCase().startsWith('yesterday')) {
+  if (s.toLowerCase() === 'today' || s.toLowerCase().startsWith('today')) return new Date();
+  if (s.toLowerCase() === 'yesterday' || s.toLowerCase().startsWith('yesterday')) {
     const d = new Date();
     d.setDate(d.getDate() - 1);
     return d;
   }
 
-  // Handle format like "18 Aug 2026 at 05:18 AM"
-  const cleanS = s.replace(/\bat\b/gi, '').trim();
-  let d = new Date(cleanS);
+  let isoFormat = s;
+  if (s.includes(' ') && !s.includes('T')) {
+    isoFormat = s.replace(' ', 'T');
+  }
+
+  let d = new Date(isoFormat);
   if (!isNaN(d.getTime())) return d;
 
-  if (s.includes(' ') && !s.includes('T')) {
-    s = s.replace(' ', 'T');
-    d = new Date(s);
-    if (!isNaN(d.getTime())) return d;
-  }
+  d = new Date(s);
+  if (!isNaN(d.getTime())) return d;
+
+  const cleanS = s.replace(/\bat\b/gi, '').trim();
+  d = new Date(cleanS);
+  if (!isNaN(d.getTime())) return d;
 
   return new Date();
 }
@@ -54,7 +63,7 @@ export function formatExactDateAndTime(dateObj) {
   yesterday.setDate(now.getDate() - 1);
   const yesterdayStr = yesterday.toDateString();
 
-  const timeStr = d.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+  const timeStr = d.toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit', hour12: true });
   const dStr = d.toDateString();
 
   if (dStr === todayStr) {
@@ -128,8 +137,51 @@ function notifyDonationChange() {
 }
 
 
+export function isExpiredDonation(item) {
+  if (!item) return true;
+  try {
+    const dateObj = parseBackendDate(item.created_at_raw || item.created_at || item.posted_timestamp);
+    const timeMs = dateObj.getTime();
+    if (isNaN(timeMs) || timeMs <= 0) return false;
+    const ageMs = Date.now() - timeMs;
+    return ageMs > 24 * 60 * 60 * 1000; // 24 Hours cutoff
+  } catch (e) {
+    return false;
+  }
+}
+
+export function deduplicateDonationsStore(list) {
+  if (!Array.isArray(list)) return [];
+
+  const seenIds = new Set();
+  const seenContentKeys = new Set();
+
+  return list.filter(item => {
+    if (!item) return false;
+    if (isExpiredDonation(item)) return false;
+    const idStr = String(item.id || '');
+    if (deletedDonationIdsSet.has(idStr)) return false;
+
+    if (seenIds.has(idStr)) return false;
+
+    const fName = (item.food_name || '').trim().toLowerCase();
+    const fQty = (item.quantity || '').trim().toLowerCase();
+    const fAddr = (item.pickup_address || '').trim().toLowerCase();
+    const contentKey = `${fName}_${fQty}_${fAddr}`;
+
+    if (contentKey.length > 3) {
+      if (seenContentKeys.has(contentKey)) return false;
+      seenContentKeys.add(contentKey);
+    }
+
+    seenIds.add(idStr);
+    return true;
+  });
+}
+
 function saveDonationsToStorage() {
   try {
+    localDonationsStore = deduplicateDonationsStore(localDonationsStore);
     if (Platform.OS === 'web' && typeof localStorage !== 'undefined') {
       localStorage.setItem('meal_resq_donations_db', JSON.stringify(localDonationsStore));
       localStorage.setItem('meal_resq_deleted_donations_db', JSON.stringify(Array.from(deletedDonationIdsSet)));
@@ -193,19 +245,25 @@ function loadDonationsFromStorage() {
       AsyncStorage.getItem('meal_resq_donations_db').then(res => {
         if (res) {
           const arr = JSON.parse(res);
-          if (Array.isArray(arr) && arr.length > 0) {
-            const seenIds = new Set();
-            const seenKeys = new Set();
-            localDonationsStore = arr.filter(d => {
-              if (!d || deletedDonationIdsSet.has(String(d.id))) return false;
-              const idStr = String(d.id);
-              const k = `${d.food_name}_${d.quantity}_${d.pickup_address}`;
-              if (seenIds.has(idStr) || (seenKeys.has(k) && idStr.startsWith('temp_'))) return false;
-              seenIds.add(idStr);
-              seenKeys.add(k);
-              return true;
-            });
+          if (Array.isArray(arr)) {
+            if (arr.length === 0) {
+              localDonationsStore = [];
+            } else {
+              const seenIds = new Set();
+              const seenKeys = new Set();
+              localDonationsStore = arr.filter(d => {
+                if (!d || deletedDonationIdsSet.has(String(d.id))) return false;
+                const idStr = String(d.id);
+                const k = `${d.food_name}_${d.quantity}_${d.pickup_address}`;
+                if (seenIds.has(idStr) || (seenKeys.has(k) && idStr.startsWith('temp_'))) return false;
+                seenIds.add(idStr);
+                seenKeys.add(k);
+                return true;
+              });
+            }
           }
+        } else {
+          localDonationsStore = [];
         }
       }).catch(() => {});
     }
@@ -256,9 +314,15 @@ function loadNotificationsFromStorage() {
       AsyncStorage.getItem('meal_resq_notifs_db').then(res => {
         if (res) {
           const arr = JSON.parse(res);
-          if (Array.isArray(arr) && arr.length > 0) {
-            localNotificationsStore = arr.filter(n => !deletedNotificationIdsSet.has(String(n.id)));
+          if (Array.isArray(arr)) {
+            if (arr.length === 0) {
+              localNotificationsStore = [];
+            } else {
+              localNotificationsStore = arr.filter(n => !deletedNotificationIdsSet.has(String(n.id)));
+            }
           }
+        } else {
+          localNotificationsStore = [];
         }
       }).catch(() => {});
     }
@@ -517,19 +581,24 @@ export const apiService = {
     Linking.openURL(url).catch(() => {});
   },
 
-  // Donor Endpoints
-  addOptimisticDonation(donationData) {
+  async createDonation(donationData) {
     const timeStr = formatCurrentTime();
     const foodTitle = donationData.food_name || donationData.food_title || donationData.title || 'Surplus Food';
     const foodQty = donationData.quantity || '5 kg';
     const foodCat = donationData.category || 'Vegetarian';
     const foodLoc = donationData.pickup_address || donationData.location || donationData.address || 'Local Community Center';
-    const tempId = `temp_${Date.now()}_${Math.random()}`;
+    const tempId = `temp_${Date.now()}_${Math.floor(Math.random() * 1000)}`;
+
+    let imgStr = donationData.image_url || donationData.food_image || null;
+    if (imgStr && typeof imgStr === 'string' && imgStr.length > 250000 && imgStr.startsWith('data:image')) {
+      imgStr = null;
+    }
 
     const newItem = {
       id: donationData.id || tempId,
       temp_id: tempId,
       is_optimistic: true,
+      is_syncing: true,
       posted_timestamp: Date.now(),
       created_at: `🕒 Posted Today at ${timeStr}`,
       posted_at: `🕒 Posted at ${timeStr}`,
@@ -540,8 +609,8 @@ export const apiService = {
       expiry_time: donationData.expiry_time || 'Within 4 Hours',
       pickup_address: foodLoc,
       description: donationData.description || '',
-      image_url: donationData.image_url || donationData.food_image,
-      food_image: donationData.image_url || donationData.food_image,
+      image_url: imgStr || donationData.image_url || donationData.food_image,
+      food_image: imgStr || donationData.image_url || donationData.food_image,
       donor_id: donationData.donor_id || '',
       donor_name: donationData.donor_name || 'Food Donor',
       donor_phone: donationData.donor_phone || '+91 9876543210',
@@ -549,10 +618,8 @@ export const apiService = {
       status: 'available',
     };
 
-    // Add new item to top of local store
     localDonationsStore = [newItem, ...localDonationsStore.filter(d => String(d.id) !== String(newItem.id))];
 
-    // Broadcast real-time notification alert to receivers (NGO, Volunteer, Needer)
     localNotificationsStore = [
       {
         id: Date.now(),
@@ -568,62 +635,124 @@ export const apiService = {
     saveDonationsToStorage();
     notifyDonationChange();
 
-    // Background server save with proper DonationCreate payload format
-    authHeaders().then(async headers => {
-      try {
-        const payload = {
-          food_name: foodTitle,
-          quantity: foodQty,
-          category: foodCat,
-          expiry_time: donationData.expiry_time || 'Within 4 Hours',
-          pickup_address: foodLoc,
-          description: donationData.description || '',
-          food_image: donationData.image_url || donationData.food_image || null,
-        };
-        const res = await fetchWithFallback('/api/v1/donor/donations', {
-          method: 'POST',
-          headers,
-          body: JSON.stringify(payload),
-        });
-        if (res && res.ok) {
-          const saved = await res.json();
-          if (saved && saved.id) {
-            localDonationsStore = localDonationsStore.map(d => {
-              if (String(d.id) === String(tempId) || String(d.id) === String(newItem.id)) {
-                return {
-                  ...d,
-                  id: saved.id,
-                  donor_id: saved.donor_id || d.donor_id,
-                  donor_name: saved.donor_name || d.donor_name,
-                  donor_phone: saved.donor_phone || d.donor_phone,
-                  donor_email: saved.donor_email || d.donor_email,
-                  is_optimistic: false,
-                  created_at: saved.created_at ? `🕒 Posted at ${new Date(saved.created_at).toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'})}` : d.created_at,
-                };
-              }
-              return d;
-            });
-            const seen = new Set();
-            localDonationsStore = localDonationsStore.filter(d => {
-              const k = String(d.id);
-              if (seen.has(k)) return false;
-              seen.add(k);
-              return true;
-            });
-            saveDonationsToStorage();
-            notifyDonationChange();
-          }
+    try {
+      const headers = await authHeaders(donationData.donor_email);
+      const payload = {
+        food_name: foodTitle,
+        quantity: foodQty,
+        category: foodCat,
+        expiry_time: donationData.expiry_time || 'Within 4 Hours',
+        pickup_address: foodLoc,
+        description: donationData.description || '',
+        food_image: imgStr,
+        donor_email: donationData.donor_email || newItem.donor_email || '',
+      };
+
+      const res = await fetchWithFallback('/api/v1/donor/donations', {
+        method: 'POST',
+        headers,
+        body: JSON.stringify(payload),
+      });
+
+      if (res && res.ok) {
+        const saved = await res.json();
+        if (saved && saved.id) {
+          const dateObj = parseBackendDate(saved.created_at);
+          const exactFormattedStr = formatExactDateAndTime(dateObj);
+
+          localDonationsStore = localDonationsStore.map(d => {
+            if (String(d.id) === String(tempId) || String(d.id) === String(newItem.id)) {
+              return {
+                ...d,
+                id: saved.id,
+                donor_id: saved.donor_id || d.donor_id,
+                donor_name: saved.donor_name || d.donor_name,
+                donor_phone: saved.donor_phone || d.donor_phone,
+                donor_email: saved.donor_email || d.donor_email,
+                is_optimistic: false,
+                is_syncing: false,
+                created_at: exactFormattedStr,
+                posted_at: exactFormattedStr,
+                created_at_raw: saved.created_at,
+              };
+            }
+            return d;
+          });
+
+          const seen = new Set();
+          localDonationsStore = localDonationsStore.filter(d => {
+            const k = String(d.id);
+            if (seen.has(k)) return false;
+            seen.add(k);
+            return true;
+          });
+
+          saveDonationsToStorage();
+          notifyDonationChange();
+          return saved;
         }
-      } catch (e) {
-        console.warn('Background server save note:', e);
       }
-    });
+    } catch (e) {
+      console.warn('Create donation remote POST error:', e);
+    } finally {
+      newItem.is_syncing = false;
+    }
 
     return newItem;
   },
 
-  async createDonation(donationData) {
-    return this.addOptimisticDonation(donationData);
+  addOptimisticDonation(donationData) {
+    return this.createDonation(donationData);
+  },
+
+  async updateDonation(id, donationData) {
+    const idStr = String(id);
+    const timeStr = formatCurrentTime();
+    
+    localDonationsStore = localDonationsStore.map(item => {
+      if (String(item.id) === idStr) {
+        return {
+          ...item,
+          food_name: donationData.food_name || item.food_name,
+          quantity: donationData.quantity || item.quantity,
+          category: donationData.category || item.category,
+          expiry_time: donationData.expiry_time || item.expiry_time,
+          pickup_address: donationData.pickup_address || item.pickup_address,
+          description: donationData.description !== undefined ? donationData.description : item.description,
+          image_url: donationData.image_url || donationData.food_image || item.image_url,
+          food_image: donationData.image_url || donationData.food_image || item.food_image,
+          updated_at: `🕒 Updated at ${timeStr}`,
+        };
+      }
+      return item;
+    });
+
+    saveDonationsToStorage();
+    notifyDonationChange();
+
+    try {
+      const headers = await authHeaders();
+      const payload = {
+        food_name: donationData.food_name,
+        quantity: donationData.quantity,
+        category: donationData.category,
+        expiry_time: donationData.expiry_time,
+        pickup_address: donationData.pickup_address,
+        description: donationData.description,
+        food_image: donationData.image_url || donationData.food_image || null,
+      };
+      const res = await fetchWithFallback(`/api/v1/donor/donations/${id}`, {
+        method: 'PUT',
+        headers,
+        body: JSON.stringify(payload),
+      });
+      if (res && res.ok) {
+        return await res.json();
+      }
+    } catch (e) {
+      console.warn('updateDonation remote note:', e);
+    }
+    return { success: true };
   },
 
   getLocalDonationsSync(currentUser) {
@@ -694,7 +823,7 @@ export const apiService = {
 
           const remoteMap = new Map(formattedRemote.map(item => [String(item.id), item]));
           const otherItems = localDonationsStore.filter(localItem => !remoteMap.has(String(localItem.id)));
-          localDonationsStore = [...formattedRemote, ...otherItems];
+          localDonationsStore = deduplicateDonationsStore([...formattedRemote, ...otherItems]);
           saveDonationsToStorage();
           notifyDonationChange();
 
@@ -710,7 +839,7 @@ export const apiService = {
       const uEmail = (currentUser.email || '').trim().toLowerCase();
       const uPhone = (currentUser.phone || '').trim();
 
-      return localDonationsStore.filter(d => {
+      const filtered = localDonationsStore.filter(d => {
         if (!d || deletedDonationIdsSet.has(String(d.id))) return false;
         const isIdMatch = uId && String(d.donor_id) === uId;
         const isNameMatch = uName && d.donor_name && (d.donor_name.trim().toLowerCase().includes(uName) || uName.includes(d.donor_name.trim().toLowerCase()));
@@ -718,8 +847,9 @@ export const apiService = {
         const isPhoneMatch = uPhone && d.donor_phone && d.donor_phone.trim() === uPhone;
         return isIdMatch || isNameMatch || isEmailMatch || isPhoneMatch || d.is_optimistic || !uId;
       });
+      return deduplicateDonationsStore(filtered);
     }
-    return localDonationsStore.filter(d => !deletedDonationIdsSet.has(String(d.id)));
+    return deduplicateDonationsStore(localDonationsStore.filter(d => !deletedDonationIdsSet.has(String(d.id))));
   },
 
 
@@ -755,37 +885,47 @@ export const apiService = {
       if (res && res.ok) {
         const data = await res.json();
         if (Array.isArray(data)) {
-          const formattedRemote = data.map(d => {
-            const dateObj = parseBackendDate(d.created_at);
-            const exactFormattedStr = formatExactDateAndTime(dateObj);
-            return {
-              id: d.id,
-              donor_id: d.donor_id,
-              created_at: exactFormattedStr,
-              posted_at: exactFormattedStr,
-              created_at_raw: d.created_at,
-              posted_timestamp: dateObj.getTime(),
-              food_name: d.food_name,
-              quantity: d.quantity,
-              category: d.category,
-              expiry_time: d.expiry_time,
-              pickup_address: d.pickup_address,
-              description: d.description,
-              image_url: d.food_image,
-              food_image: d.food_image,
-              donor_name: d.donor_name || 'Food Donor',
-              donor_phone: d.donor_phone || '',
-              donor_email: d.donor_email || '',
-              claimed_by_id: d.claimed_by_id || null,
-              claimed_by_name: d.claimed_by_name || null,
-              claimed_by_phone: d.claimed_by_phone || null,
-              claimed_by_role: d.claimed_by_role || null,
-              status: d.status || 'available',
-            };
-          });
+          if (data.length === 0) {
+            localDonationsStore = [];
+            if (Platform.OS === 'web' && typeof localStorage !== 'undefined') {
+              localStorage.removeItem('meal_resq_donations_db');
+            }
+            if (AsyncStorage) {
+              AsyncStorage.removeItem('meal_resq_donations_db').catch(() => {});
+            }
+          } else {
+            const formattedRemote = data.map(d => {
+              const dateObj = parseBackendDate(d.created_at);
+              const exactFormattedStr = formatExactDateAndTime(dateObj);
+              return {
+                id: d.id,
+                donor_id: d.donor_id,
+                created_at: exactFormattedStr,
+                posted_at: exactFormattedStr,
+                created_at_raw: d.created_at,
+                posted_timestamp: dateObj.getTime(),
+                food_name: d.food_name,
+                quantity: d.quantity,
+                category: d.category,
+                expiry_time: d.expiry_time,
+                pickup_address: d.pickup_address,
+                description: d.description,
+                image_url: d.food_image,
+                food_image: d.food_image,
+                donor_name: d.donor_name || 'Food Donor',
+                donor_phone: d.donor_phone || '',
+                donor_email: d.donor_email || '',
+                claimed_by_id: d.claimed_by_id || null,
+                claimed_by_name: d.claimed_by_name || null,
+                claimed_by_phone: d.claimed_by_phone || null,
+                claimed_by_role: d.claimed_by_role || null,
+                status: d.status || 'available',
+              };
+            });
 
-          const pendingTemp = localDonationsStore.filter(d => String(d.id).startsWith('temp_'));
-          localDonationsStore = [...pendingTemp, ...formattedRemote];
+            const pendingTemp = localDonationsStore.filter(d => String(d.id).startsWith('temp_'));
+            localDonationsStore = deduplicateDonationsStore([...pendingTemp, ...formattedRemote]);
+          }
           saveDonationsToStorage();
           notifyDonationChange();
         }
@@ -841,14 +981,7 @@ export const apiService = {
           });
 
           const combined = [...pendingTempItems, ...formattedRemote];
-          const seen = new Set();
-          localDonationsStore = combined.filter(d => {
-            if (deletedDonationIdsSet.has(String(d.id))) return false;
-            const k = String(d.id);
-            if (seen.has(k)) return false;
-            seen.add(k);
-            return true;
-          });
+          localDonationsStore = deduplicateDonationsStore(combined);
 
           saveDonationsToStorage();
           notifyDonationChange();
@@ -858,7 +991,7 @@ export const apiService = {
       console.warn('getAvailableDonations remote fetch note:', e);
     }
 
-    return localDonationsStore.filter(d => d.status === 'available' && !deletedDonationIdsSet.has(String(d.id)));
+    return deduplicateDonationsStore(localDonationsStore.filter(d => d.status === 'available' && !deletedDonationIdsSet.has(String(d.id))));
   },
 
 
@@ -927,12 +1060,16 @@ export const apiService = {
     try {
       const headers = await authHeaders();
       const res = await fetchWithFallback(`/api/v1/ngo/accept/${id}`, { method: 'POST', headers });
-      if (res.ok) return await res.json();
+      if (res.ok) {
+        await this.syncAllDonationsFromBackend();
+        return await res.json();
+      }
     } catch (e) {
       console.warn('acceptDonation fallback notice:', e);
     }
     return { success: true, message: 'Donation accepted!' };
   },
+
 
   async reserveFood(id, claimerUser) {
     if (claimerUser?.role === 'needer') {
@@ -996,39 +1133,71 @@ export const apiService = {
     if (!user) return [];
 
     try {
-      const headers = await authHeaders();
+      const headers = await authHeaders(user.email);
       const res = await fetchWithFallback('/api/v1/notifications', { headers });
       if (res && res.ok) {
         const data = await res.json();
-        if (Array.isArray(data) && data.length > 0) {
-          const remoteIds = new Set(data.map(d => String(d.id)));
-          const extraLocal = localNotificationsStore.filter(d => !remoteIds.has(String(d.id)));
-          localNotificationsStore = [...data, ...extraLocal].filter(n => !deletedNotificationIdsSet.has(String(n.id)));
+        if (Array.isArray(data)) {
+          if (data.length === 0) {
+            localNotificationsStore = [];
+          } else {
+            const remoteFormatted = data.map(n => ({
+              ...n,
+              created_at: formatExactDateAndTime(parseBackendDate(n.created_at)),
+              posted_at: formatExactDateAndTime(parseBackendDate(n.created_at)),
+              user_id: n.user_id,
+              target_user_id: n.user_id,
+            }));
+
+            const remoteIds = new Set(remoteFormatted.map(d => String(d.id)));
+            const extraLocal = localNotificationsStore.filter(d => !remoteIds.has(String(d.id)));
+            localNotificationsStore = [...remoteFormatted, ...extraLocal].filter(n => !deletedNotificationIdsSet.has(String(n.id)));
+          }
           saveNotificationsToStorage();
         }
       }
     } catch (e) {}
 
     const nonDeleted = localNotificationsStore.filter(n => !deletedNotificationIdsSet.has(String(n.id)));
-    const role = user.role;
-    const userId = String(user.id);
+    const role = (user.role || '').toLowerCase();
+    const userId = String(user.id || '');
     const userEmail = (user.email || '').toLowerCase().trim();
 
     return nonDeleted.filter(n => {
+      const nUserId = String(n.user_id || n.target_user_id || '');
+      const nEmail = (n.target_user_email || '').toLowerCase().trim();
+      const isMyNotification = (nUserId && nUserId === userId) || (nEmail && nEmail === userEmail);
+
       if (role === 'donor') {
-        const isTargetedToMe = (n.target_user_id && String(n.target_user_id) === userId) ||
-                               (n.target_user_email && n.target_user_email.toLowerCase().trim() === userEmail && userEmail.length > 0);
-        const isClaimedAlert = n.title && (n.title.includes('Food Claimed Alert') || n.title.includes('Food Claimed'));
-        return Boolean(isTargetedToMe && isClaimedAlert);
+        return Boolean(isMyNotification || (n.title && (n.title.includes('Food Claimed') || n.title.includes('Claim Alert'))));
       }
 
-      const isTargetedToMe = (n.target_user_id && String(n.target_user_id) === userId) ||
-                             (n.target_user_email && n.target_user_email.toLowerCase().trim() === userEmail && userEmail.length > 0);
-      const isMyClaimConfirmed = Boolean(isTargetedToMe && n.title && (n.title.includes('Food Claim Confirmed') || n.title.includes('Meal Reservation Confirmed')));
-      const isNewFoodPosted = Boolean(n.is_broadcast_to_receivers || (n.title && (n.title.includes('New Surplus Food') || n.title.includes('New Food Available') || n.title.includes('New Food'))));
-
-      return Boolean(isMyClaimConfirmed || isNewFoodPosted);
+      // NGO, Volunteer, Needer
+      const isBroadcast = Boolean(n.is_broadcast_to_receivers || (n.title && (n.title.includes('New Surplus Food') || n.title.includes('New Food') || n.title.includes('Food Available'))));
+      return Boolean(isMyNotification || isBroadcast);
     });
+  },
+
+  async deleteNotification(id, user = null) {
+    deletedNotificationIdsSet.add(String(id));
+    localNotificationsStore = localNotificationsStore.filter(n => String(n.id) !== String(id));
+    saveNotificationsToStorage();
+    try {
+      const headers = await authHeaders(user?.email);
+      await fetchWithFallback(`/api/v1/notifications/${id}`, { method: 'DELETE', headers });
+    } catch (e) {}
+    return { success: true };
+  },
+
+  async clearAllNotifications(user = null) {
+    localNotificationsStore.forEach(n => deletedNotificationIdsSet.add(String(n.id)));
+    localNotificationsStore = [];
+    saveNotificationsToStorage();
+    try {
+      const headers = await authHeaders(user?.email);
+      await fetchWithFallback('/api/v1/notifications/clear-all', { method: 'DELETE', headers });
+    } catch (e) {}
+    return { success: true };
   },
 
 
@@ -1083,47 +1252,7 @@ export const apiService = {
     return { total_donations: localDonationsStore.length || 12, active_pickups: 3, rescued_meals: 450, total_users: 28 };
   },
 
-  // Notifications
-  async getNotifications() {
-    loadNotificationsFromStorage();
-    authHeaders().then(headers => {
-      fetchWithFallback('/api/v1/notifications', { headers }).then(res => {
-        if (res.ok) {
-          res.json().then(data => {
-            if (Array.isArray(data) && data.length > 0) {
-              const remoteIds = new Set(data.map(d => String(d.id)));
-              const extraLocal = localNotificationsStore.filter(d => !remoteIds.has(String(d.id)));
-              localNotificationsStore = [...data, ...extraLocal].filter(n => !deletedNotificationIdsSet.has(String(n.id)));
-              saveNotificationsToStorage();
-            }
-          }).catch(() => {});
-        }
-      }).catch(() => {});
-    });
-    return localNotificationsStore.filter(n => !deletedNotificationIdsSet.has(String(n.id)));
-  },
 
-  async deleteNotification(id) {
-    deletedNotificationIdsSet.add(String(id));
-    localNotificationsStore = localNotificationsStore.filter(n => String(n.id) !== String(id));
-    saveNotificationsToStorage();
-    try {
-      const headers = await authHeaders();
-      await fetchWithFallback(`/api/v1/notifications/${id}`, { method: 'DELETE', headers });
-    } catch (e) {}
-    return { success: true };
-  },
-
-  async clearAllNotifications() {
-    localNotificationsStore.forEach(n => deletedNotificationIdsSet.add(String(n.id)));
-    localNotificationsStore = [];
-    saveNotificationsToStorage();
-    try {
-      const headers = await authHeaders();
-      await fetchWithFallback('/api/v1/notifications/clear-all', { method: 'DELETE', headers });
-    } catch (e) {}
-    return { success: true };
-  },
 
 
   async markAllNotificationsRead() {
@@ -1165,13 +1294,52 @@ export const apiService = {
     }
     return null;
   },
+
+  async syncPendingOptimisticDonations() {
+    const pending = localDonationsStore.filter(d => d && (String(d.id).startsWith('temp_') || d.is_optimistic));
+    for (const item of pending) {
+      try {
+        const headers = await authHeaders(item.donor_email);
+        let imgStr = item.food_image && typeof item.food_image === 'string' && item.food_image.length < 250000 ? item.food_image : null;
+        const payload = {
+          food_name: item.food_name,
+          quantity: item.quantity,
+          category: item.category || 'Vegetarian',
+          expiry_time: item.expiry_time || 'Within 4 Hours',
+          pickup_address: item.pickup_address,
+          description: item.description || '',
+          food_image: imgStr,
+        };
+        const res = await fetchWithFallback('/api/v1/donor/donations', {
+          method: 'POST',
+          headers,
+          body: JSON.stringify(payload),
+        });
+        if (res && res.ok) {
+          const saved = await res.json();
+          if (saved && saved.id) {
+            item.id = saved.id;
+            item.is_optimistic = false;
+            saveDonationsToStorage();
+            notifyDonationChange();
+          }
+        }
+      } catch (e) {}
+    }
+  },
 };
 
 // 1.5-Second Live Real-Time Auto-Polling Loop (Syncs Web & Mobile App Instantly)
 if (typeof setInterval !== 'undefined') {
   setInterval(() => {
     try {
+      if (authService && typeof authService.getAllRegisteredUsers === 'function') {
+        authService.getAllRegisteredUsers().catch(() => {});
+      }
       if (apiService) {
+        if (typeof apiService.syncPendingOptimisticDonations === 'function') {
+          apiService.syncPendingOptimisticDonations().catch(() => {});
+        }
         if (typeof apiService.getAvailableDonations === 'function') {
           apiService.getAvailableDonations().catch(() => {});
         }
@@ -1193,17 +1361,20 @@ if (typeof setInterval !== 'undefined') {
 
 export function getFoodItemImage(item) {
 
-  if (!item) return 'https://images.unsplash.com/photo-1504674900247-0877df9cc836?w=800&auto=format&fit=crop&q=80';
+  if (!item) return 'https://images.unsplash.com/photo-1631515243349-e0cb75fb8d3a?w=800&auto=format&fit=crop&q=80';
   
   const customImg = item.food_image || item.image_url || item.donation?.food_image || item.donation?.image_url;
   if (customImg && typeof customImg === 'string' && customImg.trim().length > 10) {
+    if (customImg.includes('photo-1563379091339')) {
+      return 'https://images.unsplash.com/photo-1631515243349-e0cb75fb8d3a?w=800&auto=format&fit=crop&q=80';
+    }
     return customImg.trim();
   }
 
   const name = ((item.food_name || item.title || item.donation?.food_name || '') + ' ' + (item.category || item.donation?.category || '')).toLowerCase();
 
   if (name.includes('biryani') || name.includes('dum')) {
-    return 'https://images.unsplash.com/photo-1563379091339-03b21ab4a4f8?w=800&auto=format&fit=crop&q=80';
+    return 'https://images.unsplash.com/photo-1631515243349-e0cb75fb8d3a?w=800&auto=format&fit=crop&q=80';
   }
   if (name.includes('rice') || name.includes('pulao') || name.includes('fried rice')) {
     return 'https://images.unsplash.com/photo-1512058564366-18510be2db19?w=800&auto=format&fit=crop&q=80';
