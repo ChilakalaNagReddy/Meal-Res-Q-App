@@ -773,37 +773,19 @@ export const apiService = {
 
   getLocalDonationsSync(currentUser) {
     loadDonationsFromStorage();
-    if (!currentUser) return localDonationsStore.filter(d => !deletedDonationIdsSet.has(String(d.id)));
-    return localDonationsStore.filter(d => {
-      if (!d || deletedDonationIdsSet.has(String(d.id))) return false;
-      if (currentUser.role === 'donor') {
-        const uId = String(currentUser.id || '');
-        const uName = (currentUser.name || '').trim().toLowerCase();
-        const uEmail = (currentUser.email || '').trim().toLowerCase();
-        const uPhone = (currentUser.phone || '').trim();
-
-        const isIdMatch = uId && String(d.donor_id) === uId;
-        const isNameMatch = uName && d.donor_name && (d.donor_name.trim().toLowerCase().includes(uName) || uName.includes(d.donor_name.trim().toLowerCase()));
-        const isEmailMatch = uEmail && d.donor_email && d.donor_email.trim().toLowerCase() === uEmail;
-        const isPhoneMatch = uPhone && d.donor_phone && d.donor_phone.trim() === uPhone;
-        return isIdMatch || isNameMatch || isEmailMatch || isPhoneMatch || d.is_optimistic || !uId;
-      }
-      return true;
-    });
+    return deduplicateDonationsStore(localDonationsStore.filter(d => d && !deletedDonationIdsSet.has(String(d.id))));
   },
-
 
   getAvailableDonationsSync() {
     loadDonationsFromStorage();
-    return localDonationsStore.filter(d => d.status === 'available' && !deletedDonationIdsSet.has(String(d.id)));
+    return deduplicateDonationsStore(localDonationsStore.filter(d => d && d.status === 'available' && !deletedDonationIdsSet.has(String(d.id))));
   },
 
   async getMyDonations(currentUser) {
     loadDonationsFromStorage();
     await this.syncAllDonationsFromBackend();
     try {
-
-      const headers = await authHeaders();
+      const headers = await authHeaders(currentUser?.email);
       const res = await fetchWithFallback('/api/v1/donor/donations', { headers });
       if (res && res.ok) {
         const data = await res.json();
@@ -836,37 +818,20 @@ export const apiService = {
             };
           });
 
-
           const pendingTemp = localDonationsStore.filter(d => String(d.id).startsWith('temp_') || d.is_optimistic);
           localDonationsStore = deduplicateDonationsStore([...pendingTemp, ...formattedRemote]).filter(d => !isDonationOlderThan24Hours(d));
           saveDonationsToStorage();
           notifyDonationChange();
-
-
+          return localDonationsStore;
         }
       }
     } catch (e) {
       console.warn('getMyDonations remote fetch error:', e);
     }
 
-    if (currentUser) {
-      const uId = String(currentUser.id || '');
-      const uName = (currentUser.name || '').trim().toLowerCase();
-      const uEmail = (currentUser.email || '').trim().toLowerCase();
-      const uPhone = (currentUser.phone || '').trim();
-
-      const filtered = localDonationsStore.filter(d => {
-        if (!d || deletedDonationIdsSet.has(String(d.id))) return false;
-        const isIdMatch = uId && String(d.donor_id) === uId;
-        const isNameMatch = uName && d.donor_name && (d.donor_name.trim().toLowerCase().includes(uName) || uName.includes(d.donor_name.trim().toLowerCase()));
-        const isEmailMatch = uEmail && d.donor_email && d.donor_email.trim().toLowerCase() === uEmail;
-        const isPhoneMatch = uPhone && d.donor_phone && d.donor_phone.trim() === uPhone;
-        return isIdMatch || isNameMatch || isEmailMatch || isPhoneMatch || d.is_optimistic || !uId;
-      });
-      return deduplicateDonationsStore(filtered);
-    }
-    return deduplicateDonationsStore(localDonationsStore.filter(d => !deletedDonationIdsSet.has(String(d.id))));
+    return deduplicateDonationsStore(localDonationsStore.filter(d => d && !deletedDonationIdsSet.has(String(d.id))));
   },
+
 
 
   async getDonorDonations(currentUser) {
