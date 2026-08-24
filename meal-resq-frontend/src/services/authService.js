@@ -60,6 +60,21 @@ async function syncBackendUsers() {
       if (Array.isArray(data)) {
         if (data.length === 0) {
           registeredUsersList = [];
+          userLoginLogs = [];
+          memoryToken = null;
+          memoryUser = null;
+          if (Platform.OS === 'web' && typeof localStorage !== 'undefined') {
+            localStorage.removeItem('registered_users_db');
+            localStorage.removeItem('user_login_logs_db');
+            localStorage.removeItem('user_data');
+            localStorage.removeItem('jwt_token');
+          }
+          if (AsyncStorage) {
+            AsyncStorage.removeItem('registered_users_db').catch(() => {});
+            AsyncStorage.removeItem('user_login_logs_db').catch(() => {});
+            AsyncStorage.removeItem('user_data').catch(() => {});
+            AsyncStorage.removeItem('jwt_token').catch(() => {});
+          }
         } else {
           const freshList = [];
           data.forEach(remoteUser => {
@@ -68,16 +83,17 @@ async function syncBackendUsers() {
             freshList.push({ ...remoteUser, password: 'password' });
           });
           registeredUsersList = freshList;
-        }
-        if (Platform.OS === 'web' && typeof localStorage !== 'undefined') {
-          localStorage.setItem('registered_users_db', JSON.stringify(registeredUsersList));
-        } else if (AsyncStorage) {
-          AsyncStorage.setItem('registered_users_db', JSON.stringify(registeredUsersList)).catch(() => {});
+          if (Platform.OS === 'web' && typeof localStorage !== 'undefined') {
+            localStorage.setItem('registered_users_db', JSON.stringify(registeredUsersList));
+          } else if (AsyncStorage) {
+            AsyncStorage.setItem('registered_users_db', JSON.stringify(registeredUsersList)).catch(() => {});
+          }
         }
       }
     }
   } catch (e) {}
 }
+
 
 
 async function getRegisteredUsers() {
