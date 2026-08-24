@@ -836,11 +836,11 @@ export const apiService = {
           });
 
 
-          const remoteMap = new Map(formattedRemote.map(item => [String(item.id), item]));
-          const otherItems = localDonationsStore.filter(localItem => !remoteMap.has(String(localItem.id)));
-          localDonationsStore = deduplicateDonationsStore([...formattedRemote, ...otherItems]);
+          const pendingTemp = localDonationsStore.filter(d => String(d.id).startsWith('temp_') || d.is_optimistic);
+          localDonationsStore = deduplicateDonationsStore([...pendingTemp, ...formattedRemote]).filter(d => !isDonationOlderThan24Hours(d));
           saveDonationsToStorage();
           notifyDonationChange();
+
 
         }
       }
