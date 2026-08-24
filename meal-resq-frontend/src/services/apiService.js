@@ -76,13 +76,28 @@ export function formatExactDateAndTime(dateObj) {
   }
 }
 
+export function isDonationOlderThan24Hours(item) {
+  if (!item) return false;
+  let postedTime = item.posted_timestamp;
+  if (!postedTime && item.created_at_raw) {
+    postedTime = parseBackendDate(item.created_at_raw).getTime();
+  }
+  if (!postedTime && item.created_at) {
+    postedTime = parseBackendDate(item.created_at).getTime();
+  }
+  if (!postedTime || isNaN(postedTime)) return false;
+  const ageInMs = Date.now() - postedTime;
+  return ageInMs >= 24 * 60 * 60 * 1000;
+}
+
 const formatCurrentTime = () => {
   try {
-    return new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+    return new Date().toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit', hour12: true });
   } catch (e) {
     return '11:40 AM';
   }
 };
+
 
 
 let localDonationsStore = [];
@@ -924,7 +939,8 @@ export const apiService = {
             });
 
             const pendingTemp = localDonationsStore.filter(d => String(d.id).startsWith('temp_'));
-            localDonationsStore = deduplicateDonationsStore([...pendingTemp, ...formattedRemote]);
+            localDonationsStore = deduplicateDonationsStore([...pendingTemp, ...formattedRemote]).filter(d => !isDonationOlderThan24Hours(d));
+
           }
           saveDonationsToStorage();
           notifyDonationChange();
