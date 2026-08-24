@@ -196,23 +196,24 @@ export function deduplicateDonationsStore(list) {
 
 function saveDonationsToStorage() {
   try {
+    const validServerItems = localDonationsStore.filter(d => d && typeof d.id === 'number' && !isDonationOlderThan24Hours(d));
     localDonationsStore = deduplicateDonationsStore(localDonationsStore);
     if (Platform.OS === 'web' && typeof localStorage !== 'undefined') {
-      localStorage.setItem('meal_resq_donations_db', JSON.stringify(localDonationsStore));
+      localStorage.setItem('meal_resq_donations_db', JSON.stringify(validServerItems));
       localStorage.setItem('meal_resq_deleted_donations_db', JSON.stringify(Array.from(deletedDonationIdsSet)));
-      if (Platform.OS === 'web' && typeof window !== 'undefined' && typeof window.dispatchEvent === 'function' && typeof window.Event === 'function') {
+      if (typeof window !== 'undefined' && typeof window.dispatchEvent === 'function' && typeof window.Event === 'function') {
         try {
           window.dispatchEvent(new window.Event('storage'));
         } catch (e) {}
       }
-
     }
     if (AsyncStorage) {
-      AsyncStorage.setItem('meal_resq_donations_db', JSON.stringify(localDonationsStore)).catch(() => {});
+      AsyncStorage.setItem('meal_resq_donations_db', JSON.stringify(validServerItems)).catch(() => {});
       AsyncStorage.setItem('meal_resq_deleted_donations_db', JSON.stringify(Array.from(deletedDonationIdsSet))).catch(() => {});
     }
   } catch (e) {}
 }
+
 
 function loadDonationsFromStorage() {
   try {
